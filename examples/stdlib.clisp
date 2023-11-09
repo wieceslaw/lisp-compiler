@@ -1,0 +1,17 @@
+(defun print(addr)
+    (setq len (load addr))
+    (setq i 0)
+    (loop (>= len i)
+        (setq i (+ i 1))
+        (put (load (+ addr i)))
+    )
+)
+
+(defun print-num(n)
+    ; вывести число
+    '1' '2' '3' '4' ;
+)
+
+(defun read(addr, n)
+    ; прочитать (максимум) n символов в буфер по адресу (сформировать Pascal-строку)
+)

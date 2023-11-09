@@ -1,0 +1,3 @@
+; напечатать hello world
+
+(print "Hello, world!")
