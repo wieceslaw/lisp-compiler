@@ -1,0 +1,78 @@
+(load <addr>)             -> <result>
+(store <addr> <value>)    -> <value>
+(put <value>)             -> <value>
+(get)                     -> <result>
+(loop <condition> <true> <false>) -> <true> | <false>
+(defun ...)               -> 0
+(setq <varname> <value>)  -> <value>
+(<func> <params>)         -> <result>
+
+(load <expr-address>)
+=
+<expr>          % ... <addr>
+load            % ... <addr> <val>
+swop            % ... <val>
+
+(store <expr-address> <expr-value>)
+=
+<expr>          % ... <addr>
+<expr>          % ... <addr> <val>
+store           % ... <addr> <val>
+swop            % ... <val>
+
+(get)
+=
+get             % ... <val>
+
+(put <expr>)
+=
+<expr>          % ... <val>
+put             % ... <val>
+
+(<bi> <expr-1> <expr-2>)
+=
+<expr>
+<expr>
+<bi>
+swop
+swop
+
+(if <expr-cond> <expr-true> <expr-false>)
+start:
+    <expr>              % ... <expr-cond>
+    jz   false-$hash
+    jnz  true-$hash
+true-$hash:
+    <expr>              % ... <expr-cond> <expr-true>
+    jmp  after-$hash
+false-$hash:
+    <expr>              % ... <expr-cond> <expr-false>
+    jmp  after-$hash
+after-$hash:
+    swop                % ... <expr-true|false>
+
+
+stack assembly:
+put     (0: value)
+get
+store   (0: addr, 1: value)
+load    (0: addr)
+lstore  (0: i, 1: value)
+lload   (0: i)
+push <op>
+pop
+swap
+halt
+jz
+jnz
+jl
+jg
+jmp
+
+add     (0: value, 1: value)
+sub     (0: value, 1: value)
+mul     (0: value, 1: value)
+mod     (0: value, 1: value)
+and     (0: value, 1: value)
+or      (0: value, 1: value)
+not     (0: value)

@@ -1,14 +1,5 @@
-Ключевые слова:
-- defun - объявить функцию
-- if - объявить условное выражение
-- loop - объявить цикл
-- setq - объявить переменную ИЛИ задать ей новое значение
-- alloc
-
-
 Синтаксис:
 ```ebnf
-
 <program>               := <expressions> EOF
 
 <expressions>           := | <expressions> <expression>
@@ -46,14 +37,15 @@
 
 <false-expression>      := <expression>
 
-<literal>               := <number-literal> | <string-literal>
+<literal>               := <number-literal> | <string-literal> | <character-literal>
 
 <number-literal>        := [0-9]+
 
 <string-literal>        := "\w*"
 
-<varname>               := [a-zA-Z]\w*
+<character-literal>     := '.'
 
+<varname>               := [a-zA-Z]\w*
 ```
 
 Пример кода:
