@@ -1,31 +1,32 @@
 import re
 from enum import Enum
 
+
 class TokenType(str, Enum):
-    OPEN_BRACKET        = "T_OPEN_BRACKET"      # (
-    CLOSE_BRACKET       = "T_CLOSE_BRACKET"     # )
-    STRING_LITERAL      = "T_STRING_LITERAL"    # "\w*"
-    CHARACTER_LITERAL   = "T_CHARACTER_LITERAL" # '.'
-    NUMBER_LITERAL      = "T_NUMBER_LITERAL"    # [0-9]+
-    VARNAME             = "T_VARNAME"           # \w+
+    OPEN_BRACKET = "T_OPEN_BRACKET"  # (
+    CLOSE_BRACKET = "T_CLOSE_BRACKET"  # )
+    STRING_LITERAL = "T_STRING_LITERAL"  # "\w*"
+    CHARACTER_LITERAL = "T_CHARACTER_LITERAL"  # '.'
+    NUMBER_LITERAL = "T_NUMBER_LITERAL"  # [0-9]+
+    VARNAME = "T_VARNAME"  # \w+
 
-    PLUS                = "T_PLUS"              # +
-    SUB                 = "T_SUB"               # -
-    MUL                 = "T_MUL"               # *
-    DIV                 = "T_DIV"               # /
-    EQUALS              = "T_EQUALS"            # =
-    LESS                = "T_LESS"              # <
-    GREATER             = "T_GREATER"           # >
+    PLUS = "T_PLUS"  # +
+    SUB = "T_SUB"  # -
+    MUL = "T_MUL"  # *
+    DIV = "T_DIV"  # /
+    EQUALS = "T_EQUALS"  # =
+    LESS = "T_LESS"  # <
+    GREATER = "T_GREATER"  # >
 
-    MOD                 = "T_MOD"               # mod
-    AND                 = "T_AND"               # and
-    OR                  = "T_OR"                # or
-    NOT                 = "T_NOT"               # not
+    MOD = "T_MOD"  # mod
+    AND = "T_AND"  # and
+    OR = "T_OR"  # or
+    NOT = "T_NOT"  # not
 
-    KEY_DEFUN           = "T_KEY_DEFUN"         # defun
-    KEY_LOOP            = "T_KEY_LOOP"          # loop
-    KEY_SETQ            = "T_KEY_SETQ"          # setq
-    KEY_IF              = "T_KEY_IF"            # if
+    KEY_DEFUN = "T_KEY_DEFUN"  # defun
+    KEY_LOOP = "T_KEY_LOOP"  # loop
+    KEY_SETQ = "T_KEY_SETQ"  # setq
+    KEY_IF = "T_KEY_IF"  # if
 
     # KEY_ALLOC           = "T_KEY_ALLOC"         # alloc
     # KEY_PUT             = "T_KEY_PUT"           # put
@@ -33,50 +34,51 @@ class TokenType(str, Enum):
     # KEY_LOAD            = "T_KEY_LOAD"          # load
     # KEY_STORE           = "T_KEY_STORE"         # store
 
-
     def __repr__(self):
         return self.value
 
 
 tokens = [
-    (r"\(",             TokenType.OPEN_BRACKET),
-    (r"\)",             TokenType.CLOSE_BRACKET),
-    (r"\+",             TokenType.PLUS),
-    (r"-",              TokenType.SUB),
-    (r"\*",             TokenType.MUL),
-    (r"/",              TokenType.DIV),
-    (r"=",              TokenType.EQUALS),
-    (r"<",              TokenType.LESS),
-    (r">",              TokenType.GREATER),
-    (r"mod",            TokenType.MOD),
-    (r"and",            TokenType.AND),
-    (r"or",             TokenType.OR),
-    (r"not",            TokenType.NOT),
-    (r"defun",          TokenType.KEY_DEFUN),
-    (r"loop",           TokenType.KEY_LOOP),
-    (r"setq",           TokenType.KEY_SETQ),
-    (r"if",             TokenType.KEY_IF),
-    (r"'.'",            TokenType.CHARACTER_LITERAL),
-    (r'"(.*)"',         TokenType.STRING_LITERAL),
-    (r"[0-9]+",         TokenType.NUMBER_LITERAL),
-    (r"[a-zA-Z]\w*",    TokenType.VARNAME),
+    (r"\(", TokenType.OPEN_BRACKET),
+    (r"\)", TokenType.CLOSE_BRACKET),
+    (r"\+", TokenType.PLUS),
+    (r"-", TokenType.SUB),
+    (r"\*", TokenType.MUL),
+    (r"/", TokenType.DIV),
+    (r"=", TokenType.EQUALS),
+    (r"<", TokenType.LESS),
+    (r">", TokenType.GREATER),
+    (r"mod", TokenType.MOD),
+    (r"and", TokenType.AND),
+    (r"or", TokenType.OR),
+    (r"not", TokenType.NOT),
+    (r"defun", TokenType.KEY_DEFUN),
+    (r"loop", TokenType.KEY_LOOP),
+    (r"setq", TokenType.KEY_SETQ),
+    (r"if", TokenType.KEY_IF),
+    (r"'.'", TokenType.CHARACTER_LITERAL),
+    (r'"(.*)"', TokenType.STRING_LITERAL),
+    (r"[0-9]+", TokenType.NUMBER_LITERAL),
+    (r"[a-zA-Z]\w*", TokenType.VARNAME),
 ]
 assert len(tokens) == len([i for i in TokenType])  # assert that all cases are matched
 tokens = [(re.compile(pattern), ttype) for pattern, ttype in tokens]  # compile patterns
 
+
 def operators():
     return {
-            TokenType.MOD,
-            TokenType.AND,
-            TokenType.OR,
-            TokenType.PLUS,
-            TokenType.SUB,
-            TokenType.MUL,
-            TokenType.DIV,
-            TokenType.EQUALS,
-            TokenType.LESS,
-            TokenType.GREATER,
+        TokenType.MOD,
+        TokenType.AND,
+        TokenType.OR,
+        TokenType.PLUS,
+        TokenType.SUB,
+        TokenType.MUL,
+        TokenType.DIV,
+        TokenType.EQUALS,
+        TokenType.LESS,
+        TokenType.GREATER,
     }
+
 
 class Token:
     def __init__(self, token, line, offset):
@@ -86,11 +88,14 @@ class Token:
             match = pattern.match(token)
             if match:
                 self.type = token_type
-                if token_type == TokenType.STRING_LITERAL or token_type == TokenType.CHARACTER_LITERAL:
+                if token_type == TokenType.STRING_LITERAL:
                     self.value = token[1:-1]
                 elif token_type == TokenType.NUMBER_LITERAL:
                     assert token.isdigit()
                     self.value = int(token)
+                elif token_type == TokenType.CHARACTER_LITERAL:
+                    self.type = TokenType.NUMBER_LITERAL
+                    self.value = ord(token[1:-1])
                 else:
                     self.value = token
                 break

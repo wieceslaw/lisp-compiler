@@ -2,8 +2,9 @@ from typing import Callable
 
 from lexer import TokenType, Token, operators
 
+
 class Expression:
-    def __init__(self, token: Token):
+    def __init__(self, token: Token | None):
         self.token = token
 
     def children(self) -> list['Expression']:
@@ -11,6 +12,12 @@ class Expression:
 
     def apply(self, f: Callable[['Expression'], 'Expression']) -> None:
         return
+
+    def apply_traverse(self, f: Callable[['Expression'], 'Expression']):
+        self.apply(f)
+        for node in self.children():
+            node.apply_traverse(f)
+
 
 class RootExpression(Expression):
     def __init__(self, expressions: list[Expression]):
@@ -26,6 +33,7 @@ class RootExpression(Expression):
     def apply(self, f: Callable[['Expression'], 'Expression']) -> None:
         self.expressions = list(map(f, self.expressions))
 
+
 class FunctionCallExpression(Expression):
     def __init__(self, token: Token, name: str, arguments: list[Expression]):
         super().__init__(token)
@@ -40,6 +48,7 @@ class FunctionCallExpression(Expression):
 
     def apply(self, f: Callable[[Expression], Expression]) -> None:
         self.arguments = list(map(f, self.arguments))
+
 
 class NumberLiteralExpression(Expression):
     def __init__(self, token: Token, value: int):
@@ -58,6 +67,7 @@ class StringLiteralExpression(Expression):
     def __repr__(self) -> str:
         return 'STRING LITERAL [VALUE "{}"]'.format(self.value)
 
+
 class CharacterLiteralExpression(Expression):
     def __init__(self, token: Token, value: str):
         super().__init__(token)
@@ -66,6 +76,7 @@ class CharacterLiteralExpression(Expression):
     def __repr__(self) -> str:
         return 'CHARACTER LITERAL [VALUE "{}"]'.format(self.value)
 
+
 class VariableValueExpression(Expression):
     def __init__(self, token: Token, name: str):
         super().__init__(token)
@@ -73,6 +84,7 @@ class VariableValueExpression(Expression):
 
     def __repr__(self):
         return 'VARIABLE [VALUE: "{}"]'.format(self.name)
+
 
 class ConditionExpression(Expression):
     def __init__(self,
@@ -97,6 +109,7 @@ class ConditionExpression(Expression):
         self.true_expression = f(self.true_expression)
         self.false_expression = f(self.false_expression)
 
+
 class LoopExpression(Expression):
     def __init__(self, token: Token, condition: Expression, body: list[Expression]) -> None:
         super().__init__(token)
@@ -112,6 +125,7 @@ class LoopExpression(Expression):
     def apply(self, f: Callable[[Expression], Expression]) -> None:
         self.body = list(map(f, self.body))
         self.condition = f(self.condition)
+
 
 class FunctionDefinitionExpression(Expression):
     def __init__(self, token: Token, name: str, parameters: list[str], body: list[Expression]) -> None:
@@ -130,6 +144,7 @@ class FunctionDefinitionExpression(Expression):
     def apply(self, f: Callable[[Expression], Expression]) -> None:
         self.body = list(map(f, self.body))
 
+
 class VariableAssignmentExpression(Expression):
     def __init__(self, token: Token, name: str, value: Expression) -> None:
         super().__init__(token)
@@ -144,6 +159,7 @@ class VariableAssignmentExpression(Expression):
 
     def apply(self, f: Callable[[Expression], Expression]) -> None:
         self.value = f(self.value)
+
 
 class BinaryOperationExpression(Expression):
     def __init__(self, token: Token, operator, first: Expression, second: Expression) -> None:
@@ -162,10 +178,12 @@ class BinaryOperationExpression(Expression):
         self.first = f(self.first)
         self.second = f(self.second)
 
+
 class UnaryOperatorExpression(Expression):
     def __init__(self, token: Token) -> None:
         super().__init__(token)
         # TODO: Implement
+
 
 class Parser:
     def __init__(self, tokens):
