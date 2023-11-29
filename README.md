@@ -10,8 +10,10 @@
                             | <function-call> 
                             | <if-condition> 
                             | <binary-operation> 
+                            | <unary-operator-expression>
                             | <assignment> 
                             | <loop-expression>
+                            | <allocation>
 
 <function-call>         := <varname> <arguments>
 
@@ -23,13 +25,21 @@
 
 <assignment>            := setq <varname> <expr>
 
+<allocation>            := alloc <number-literal>
+
 <if-condition>          := if <condition-expression> <true-expression> <false-expression>
 
 <loop-expression>       := loop <condition-expression> <expressions> 
 
 <binary-operator-expression> := <binary-operator> <expression> <expression>
 
-<binary-operator>       := mod | and | or | + | - | * | / | = | < | >
+<unary-operator-expression> := <unary-operator> <expression>
+
+<binary-operator>       := store | mod | and | or | + | - | = | < | >
+
+<unary-operator>        := not | put | load
+
+<nullary-operator>      := get
 
 <condition-expression>  := <expression>
 
@@ -48,233 +58,147 @@
 <varname>               := [a-zA-Z]\w*
 ```
 
-Пример кода:
-```lisp
-(defun print-str(addr)
-    (setq len (load addr))
-    (setq i 0)
-    (loop (>= len i)
-        (setq i (+ i 1))
-        (put (load (+ addr i)))
-    )
-)
+Операции:
+- `get` - прочитать значение извне
+- `put` - вывести значение
+- `alloc` - выделить буфер в статической памяти
+- `not` - логическое "не", 0 -> 1, <ненулевое число> -> 0
+- `load` - прочитать значение из ячейки по адресу
+- `store` - загрузить значение в ячейку по адресу
+- `setq` - присвоить значение переменной (и/или объявить переменную)
+- `defun` - объявить функцию
+- `42` - числовой литерал
+- `"Hello, world"` - строковый литерал
+- `'a'` - символьный литерал (=число)
+- `; comment` - комментарий
 
-(defun is-even (n) 
-    (if (= 0 (mod n 2)) 1 0)
-)
+# Организация памяти
 
-;; аллоцировать буфер размером 40 слов в статической памяти
-;; присвоить адрес выделенной памяти глобальной переменной "buffer"
-(setq buffer (alloc 40)) 
-;; после компиляции эквивалентно
-(setq buffer 0x12345678)
-```
+1. Память команд. Машинное слово - не определено? TODO
+2. Память данных. Машинное слово - 32 бит, знаковое. Линейное адресное пространство. Реализуется списком чисел.
 
-Трансляция конструкций в машинный код
+Литералы:
+- строковые - сама строка помещается в статическую память, в месте использования литерала заменяется на адрес расположения строки;
+- символьные - по организации в памяти аналогичны числовым литералам, по сути - являются макросом, чтобы не писать каждый раз ASCII код;
+- числовые - так как вся работа идет со стеком, то при "вычислении" такого литерального выражения, на стек помещается непосредственно само число.
 
-Трансляция литералов
+## Регистры
+
+- `AC` (Accumulator) - аккумулятор
+- `CR` (Command Register) - используется для хранения текущей исполняемой инструкции
+- `IP` (Instruction Pointer) - регистр инструкций
+- `DR` (Data Register) - регистр данных (для работы с памятью и с вводом/выводом)
+- `AR` (Address Register) - адресный регистр (используется при чтении/записи в память)
+- `SP` (Stack Pointer) - указатель стека
+- `FP` (Frame Pointer) - указатель фрейма
+- `BR` (Buffer Pointer) - используется во время выполнения промежуточных операций, чтобы не сбрасывать значение аккумулятора
+
+## Виды Адресации
+
+- `Absolute` - абсолютная, указывается адрес, где находится значение: `value = MEM[address]`
+- `Relative` - относительная, указывается регистр и смещение `value = MEM[register + offset]`
+- `Relative Inderect` - косвенная относительная, указывается регистр и смещение: `value = MEM[MEM[register + offset]]`
+- `Immediate` - непосредственная, указывается непосредственное значение: `value = value`
+
+В качестве регистра можно указывать `Stack Pointer` и `Frame Pointer`.
+Относительная адресация используется для работы со стеком и локальными переменными функций.
+
+Всего 19 команд, поэтому 32 = 2 ^ 5, т.е. размер кода инструкции размером 5 бит.
+Также, так как видов адресации - 4, то на их кодирование требуется еще 2 бита.
+Остается 25 бит. Адресные команды принимают адрес, смещение или непосредственное значение в качестве параметра. 
+Так как машинное слово данных размером 32 бита, как и машинное слово инструкций, то 25 бит может не хватить для кодирования адресных команд.
+Поэтому адресные команды имеют размер - 2 машинных слова (32x2).
+
+Схема адресных команд:
+
+| Вид Адресации       | Схема                                                                |
+|---------------------|----------------------------------------------------------------------|
+| `Absolute`          | `[OPCODE: 5][ADDRESSING: 2][RESERVED: 25]:[ADDRESS: 32]`             |
+| `Immediate`         | `[OPCODE: 5][ADDRESSING: 2][RESERVED: 25]:[VALUE: 32]`               |
+| `Relative`          | `[OPCODE: 5][ADDRESSING: 2][REGISTER: 1][RESERVED: 24]:[OFFSET: 32]` |
+| `Relative Inderect` | `[OPCODE: 5][ADDRESSING: 2][REGISTER: 1][RESERVED: 24]:[OFFSET: 32]` |
+
+REGISTER: `0` - `Stack Pointer`, `1` - `Stack Frame`
+
+## Система Команд Процессора
 ```text
-% 1
-.text
-start:
-    push 0x1
+add A   - AC + MEM[A] -> AC
+sub A   - AC - MEM[A] -> AC
+mod A   - AC % MEM[A] -> AC
+and A   - AC & MEM[A] -> AC
+or A    - AC | MEM[A] -> AC
+not     - ~AC -> AC
 
+flags   - FL -> AC
+ld A    - MEM[A] -> AC
+st A    - AC -> MEM[A]
+put     - AC -> IO
+get     - IO -> AC
+push    - SP - 1 -> SP
+pop     - SP + 1 -> SP
 
-% "Hello, world!"
-.data
-$hash: "Hello, world!" % pascal-encoded string
+jmp A   - A -> IR
+jz A    - A -> IR, if AC == 0
+call A  - ...
+ret     - ...
 
-.text
-start:
-    push $hash
+nop     - no action
+halt    - stop
 ```
 
-Трансляция бинарного оператора
 ```text
-% (+ 1 2) 
+Работа с данными:
+store (address) <value> -> None - записать по адресу значение со стека
+load (address) -> <value> - прочитать значение по адресу и положить на стек
+put <value> -> None - прочитать значение со стека и записать во вне
+get -> <value> - получить слово из вне и положить на стек
+push (value) -> <value> - положить литерал на стек
+pop -> None - опустить стек
 
-.text
-start:
-    push 1      % 1
-    push 2      % 1 2
-    add         % 1 2 3
-    swop        % 1 3
-    swop        % 3
+Вычисление:
+add <operand> <operand> -> <result> - сложить два числа и положить результат на стек
+sub <operand> <operand> -> <result> - вычесть первое число на стеке из второго и положить результат на стек
+mod <operand> <operand> -> <result> TODO
+and <operand> <operand> -> <result> TODO
+or <operand> <operand> -> <result> TODO
+not <operand> <operand> -> <result> TODO
+sign <operand> <operand> -> <result> TODO
+
+Управление потоком исполнения:
+jmp (address) - безусловный переход
+jz (address) <value> - переход, если на стеке находится 0 
+call (address) - вызов функции, сохраняет адрес возврата и указатель на текущий фрейм
+ret - возврат из функции
+
+Остальное:
+nop - бездействие, вспомогательная инструкция для упрощения процесса компиляции
+halt - остановка 
 ```
 
-Трансляция условного выражения
-```text
-% (if (= 1 2) 5 20)
+sadd:
+ld [sp+1]
+add [sp+2]
+st [sp]
+push
 
-.text
-start:
-    ...
-    push 1      % 1
-    push 2      % 1 2
-    eq          % 1 2 0
-    swop        % 1 0
-    swop        % 0
-    jz   false-$hash
-    jnz  true-$hash
-true-$hash:
-    push 1      
-    jmp  after-$hash
-false-$hash:
-    push 0      % 0 20
-    jmp  after-$hash % 0 20
-after-$hash:
-    swop        % 20
-```
+sstore A:
+ld [sp+1]
+st [A]
 
-Трансляция функций
-```text
-(defun is-even (n) 
-    (= 0 (mod n 2))
-)
-(defun 5)
-% TODO: учесть, что надо pop все выражения в скоупе тела, кроме последнего (результат функции)
+sload A:
+ld [A]
+st [sp+1]
+push
 
-.text
-is-even-$hash:          % ... 5
-    push 0              % ... 5 0
-    
-    ald 0               % ... 5 0 5
-    push 2              % ... 5 0 5 2 
-    mod                 % ... 5 0 5 2 1
-    % очистка после вызова бинарного оператора
-    swop                % ... 5 0 5 1
-    swop                % ... 5 0 1
-    
-    eq                  % ... 5 0 1 0
-    % очистка после вызова бинарного оператора
-    swop                % ... 5 0 0
-    swop                % ... 5 0
-    
-    % убираем аргументы
-    swop                % ... 0
-    ret
+sput X:
+load #X
+put
+st [sp+1]
+push
 
-start:
-    % ложим аргументы
-    push 5              % 5
-    call is-even-$hash  % 5
-```
+sjmp A:
+jmp A
 
-Трансляция директивы setq
-```text
-(print (defvar i 0))    % становится директивой для выделения статических данных 
-(setq i 42)
-
-.data
-i$hash: 0
-
-.text
-start:
-    push    0           % директива раскрывается в Nil (0)
-    call    print
-    pop                 % так как print в глобальном скопе - подчищаем результат
-    
-    push    42          % вычисление выражения
-    store   [i$hash]    % запись результата по абсолютному адресу глобальной переменной
-    pop                 % так как setq вызывается в глобальном скопе - подчищаем результат
-```
-
-Трансляция цикла loop
-```text
-(defvar i 0)
-(loop (< i 10)
-    (print i)
-)
-
-.data
-i$hash: 0
-
-.text
-start:
-    push 0  % директива (defvar i 0) вычисляется в 0
-    pop     % очищаем результаты выражения, так как в глобальном скоупе
-    
-loop$hash:
-    % вычисление условного выражения начало
-    push    i$hash
-    push    10
-    less
-    swop
-    swop
-    % вычисление условного выражения конец
-    
-    jz      after$hash
-    
-    % тело цикла начало
-    push i$hash
-    call print
-    pop     % очищаем результат, так как скоуп тела цикла
-    % тело цикла конец
-    
-    jmp     loop$hash
-    
-after$hash:
-    pop     % цикл, как выражение, возвращает 0 (после вычисления условного выражения)
-            % результат очищаем, так как глобальный скоуп
-    halt
-```
-
-Инструкции для работы с функциями
-```text
-*Перед вызовом происходит заполнение стека аргументами функции
-
-call <addr>     % выполнить функцию
-    push $sf
-    push $ip
-    jmp  <addr>
-    mov  $fp    % устанавливает stack frame регистр для текущего фрейма
-
-ret % вернуться из функции
-    swap        % поменять местами адрес возврата и результат функции
-    jmp  $sp    % возврат к предыдущей функции
-    pop         % очистить адрес возврата со стека
-    swap        % поменять местами стековый фрейм предыдущего вызова и результат функции
-    mov  $fp    % загрузить frame pointer предыдущее значение
-    pop         % очистить значение со стека 
-
-ald <n> % загрузить n-ую локальную переменную исполняемой функции
-    push $fp    % указатель на начало фрейма
-    push <n>
-    sub
-    swop
-    swop        % получить адрес n-ой переменной
-    load        % получить значение по адресу
-    swop        % убрать адрес, оставить значение
-    
-ast <n> % сохранить значение в n-ую локальную переменную функции
-    TODO
-```
-
-Трансляция стековых инструкций в 8-битные
-```text
-push[abs, reg] - загрузить абсолютное значение или из регистра
-
-sub % вычитание двух 32 чисел
-    ld  [$sp]       % загрузить первый байт первого операнда
-    sub [$sp+4]     % вычесть младший байт второго операнда, положить результат в аккумулятор
-    push            % положить результат на стек
-    
-    ld  [$sp+2]
-    sub [$sp+6]
-    push
-    
-    ld  [$sp+4]
-    sub [$sp+8]
-    push
-    
-    ld  [$sp+6]
-    sub [$sp+12]
-    push
-    TODO: учесть перенос и так далее
-
-```
-TODO: 
-- loop evaluation (return value?)
-- function declaration + global variable declaration evaluation? + Где можно определять?
-- регистры 32 бита
-- добавить символьные литералы
+sjz A:
+load [sp+1]
+jz A

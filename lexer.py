@@ -12,8 +12,8 @@ class TokenType(str, Enum):
 
     PLUS = "T_PLUS"  # +
     SUB = "T_SUB"  # -
-    MUL = "T_MUL"  # *
-    DIV = "T_DIV"  # /
+    # MUL = "T_MUL"  # *
+    # DIV = "T_DIV"  # /
     EQUALS = "T_EQUALS"  # =
     LESS = "T_LESS"  # <
     GREATER = "T_GREATER"  # >
@@ -28,11 +28,11 @@ class TokenType(str, Enum):
     KEY_SETQ = "T_KEY_SETQ"  # setq
     KEY_IF = "T_KEY_IF"  # if
 
-    # KEY_ALLOC           = "T_KEY_ALLOC"         # alloc
-    # KEY_PUT             = "T_KEY_PUT"           # put
-    # KEY_GET             = "T_KEY_GET"           # get
-    # KEY_LOAD            = "T_KEY_LOAD"          # load
-    # KEY_STORE           = "T_KEY_STORE"         # store
+    KEY_ALLOC = "T_KEY_ALLOC"  # alloc
+    KEY_PUT = "T_KEY_PUT"  # put
+    KEY_GET = "T_KEY_GET"  # get
+    KEY_LOAD = "T_KEY_LOAD"  # load
+    KEY_STORE = "T_KEY_STORE"  # store
 
     def __repr__(self):
         return self.value
@@ -43,8 +43,8 @@ tokens = [
     (r"\)", TokenType.CLOSE_BRACKET),
     (r"\+", TokenType.PLUS),
     (r"-", TokenType.SUB),
-    (r"\*", TokenType.MUL),
-    (r"/", TokenType.DIV),
+    # (r"\*", TokenType.MUL),
+    # (r"/", TokenType.DIV),
     (r"=", TokenType.EQUALS),
     (r"<", TokenType.LESS),
     (r">", TokenType.GREATER),
@@ -55,6 +55,11 @@ tokens = [
     (r"defun", TokenType.KEY_DEFUN),
     (r"loop", TokenType.KEY_LOOP),
     (r"setq", TokenType.KEY_SETQ),
+    (r"alloc", TokenType.KEY_ALLOC),
+    (r"put", TokenType.KEY_PUT),
+    (r"get", TokenType.KEY_GET),
+    (r"load", TokenType.KEY_LOAD),
+    (r"store", TokenType.KEY_STORE),
     (r"if", TokenType.KEY_IF),
     (r"'.'", TokenType.CHARACTER_LITERAL),
     (r'"(.*)"', TokenType.STRING_LITERAL),
@@ -65,18 +70,33 @@ assert len(tokens) == len([i for i in TokenType])  # assert that all cases are m
 tokens = [(re.compile(pattern), ttype) for pattern, ttype in tokens]  # compile patterns
 
 
-def operators():
+def binary_operators():
     return {
         TokenType.MOD,
         TokenType.AND,
         TokenType.OR,
         TokenType.PLUS,
         TokenType.SUB,
-        TokenType.MUL,
-        TokenType.DIV,
+        # TokenType.MUL,
+        # TokenType.DIV,
         TokenType.EQUALS,
         TokenType.LESS,
         TokenType.GREATER,
+        TokenType.KEY_STORE
+    }
+
+
+def unary_operators():
+    return {
+        TokenType.NOT,
+        TokenType.KEY_LOAD,
+        TokenType.KEY_PUT
+    }
+
+
+def nullary_operators():
+    return {
+        TokenType.KEY_GET
     }
 
 

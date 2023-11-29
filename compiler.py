@@ -1,3 +1,4 @@
+from isa import Opcode, Addressing, Register
 from lexer import Lexer
 from parsing import *
 
@@ -9,7 +10,7 @@ class DataSegment:
         self.data = [0] * size
 
     def put_string(self, string: str) -> int:
-        assert self.size - self.cur >= len(string)
+        assert self.size - self.cur >= len(string), "Out of memory"
         ref = self.cur
         self.data[self.cur] = len(string)
         self.cur += 1
@@ -24,85 +25,106 @@ class DataSegment:
         self.cur += 1
         return ref
 
+    def allocate(self, size: int) -> int:
+        assert self.size - self.cur >= size, "Out of memory"
+        ref = self.cur
+        self.cur += size
+        return ref
+
     def layout(self) -> list:
         return self.data
 
 
 class TextSegment:
-    def __init__(self, size: int):
-        self.size = size
-        self.data = []
+    # TODO: Out of memory (add size)
+    def __init__(self):
+        self.instructions = []
 
-    def put(self, instructions: list) -> int:
-        address = len(self.data)
-        self.data.extend(instructions)
+    def put_one(self, instruction: dict) -> int:
+        address = len(self.instructions)
+        self.instructions.append(instruction)
+        return address
+
+    def put_many(self, instructions: list[dict]) -> int:
+        address = len(self.instructions)
+        for instruction in instructions:
+            self.put_one(instruction)
         return address
 
 
-# nop <symbol>          % function definition
-# call <symbol>         % function call
-# setq <symbol> <value> % variable assignment
-# <symbol>              % variable value
-
-# nop (label) -> nop (0)
-# call (symbol) -> call (address)
-# address: absolute, relative($sf, $sp)
-
 class Compiler:
     def __init__(self, root: RootExpression):
-        self.text = TextSegment(4096)
-        self.data = DataSegment(4096)
-        self.root = root
-        self.functions = self.extract_functions(self.root)
+        self.text_segment = TextSegment()
+        self.data_segment = DataSegment(4096)
+        self.functions = self.preprocess_functions(root)
+        self.root = self.preprocess_root(root)
+        self.symbol_table = {}
 
     def compile(self):
-        root_variables = self.collect_variables(self.root, {})
+        for function in self.functions.values():
+            self.compile_function(function["expression"], function["variables"])
+        self.compile_root(self.root["expression"], self.root["variables"])
+        self.link()
 
-        print("% ROOT VARS", root_variables)
-        for expression in self.root.expressions:
-            self.compile_expression(expression, root_variables)
-            print("pop % clean up")
-        for name, func in self.functions.items():
-            function_variables = {func.parameters[i]: i for i in range(len(func.parameters))}
-            self.collect_variables(func, function_variables)
-            print("% FUNC [{}] VARS".format(name), function_variables)
-            for expression in func.body:
-                self.compile_expression(expression, function_variables)
-                print("pop % clean up")
+    def preprocess_root(self, root: RootExpression) -> dict:
+        """
+        Извлекает глобальные переменные
+        """
+        variable_index = self.collect_variables(root, {})
+        variables = {}
+        for name in variable_index:
+            address = self.data_segment.put_variable()
+            variables[name] = {
+                "type": Addressing.ABSOLUTE,
+                "debug": "variable name: {}".format(name),
+                "value": address,
+            }
+        return {
+            "expression": root,
+            "variables": variables
+        }
 
-    def compile_global_scope(self, variables: list[str]):
-        addresses = {}
-        for variable in variables:
-            address = self.data.put_variable()
-            addresses[variable] = {"type": "absolute", "value": address}
+    def preprocess_functions(self, root: RootExpression) -> dict[str, dict]:
+        """
+        Извлекает функции из корневого выражения;
+        Индексирует локальные переменные и параметры функций;
+        """
+        function_expressions = self.extract_functions(root)
+        functions = {}
+        for function_expression in function_expressions:
+            variable_index = {function_expression.parameters[i]: i for i in range(len(function_expression.parameters))}
+            self.collect_variables(function_expression, variable_index)
+            variables = {}
+            for index, name in enumerate(variable_index):
+                variables[name] = {
+                    "addressing": Addressing.RELATIVE,
+                    "debug": "variable name: {}".format(name),
+                    "register": Register.FRAME_POINTER,
+                    "offset": index,  # TODO: +2?
+                }
+            functions[function_expression.name] = {
+                "expression": function_expression,
+                "variables": variable_index
+            }
+        return functions
 
-    def compile_function_scope(self, expression: FunctionDefinitionExpression, variables: list[str]):
-        addressed_variables = {}
-        for i, variable in enumerate(variables):
-            addressed_variables[variable] = {"type": "relative", "offset": i}
-        for i, expression in enumerate(expression.body):
-            self.compile_expression(expression, addressed_variables)
-            if i != len(expression.body):
-                print("pop % clean up")
-
-    def extract_functions(self, root: RootExpression):
-        def modifier(expression: Expression) -> Expression:
+    def extract_functions(self, root: RootExpression) -> list[FunctionDefinitionExpression]:
+        def extractor(expression: Expression) -> Expression:
             if isinstance(expression, FunctionDefinitionExpression):
-                functions[expression.name] = expression
+                functions.append(expression)
                 return NumberLiteralExpression(expression.token, 0)
             return expression
 
-        functions = {}
-        root.apply_traverse(modifier)
+        functions = []
+        root.apply_traverse(extractor)
         return functions
 
-    def collect_variables(self, expression: Expression, result: dict[str, int]):
+    def collect_variables(self, expression: Expression, result: dict[str, int]) -> dict[str, int]:
         def extract_variables(e: Expression):
             if isinstance(e, FunctionCallExpression):
-                pass
-                # assert expression.name in self.functions, "UNKNOWN SYMBOL: {}".format(expression.token)
+                assert e.name in self.functions, "Unknown function symbol [{}]".format(e.token)
             elif isinstance(e, VariableValueExpression):
-                assert e.name in result, "UNKNOWN SYMBOL: {}".format(expression.token)
+                assert e.name in result, "Unknown variable symbol [{}]".format(e.token)
             elif isinstance(e, VariableAssignmentExpression):
                 if e.name not in result:
                     result[e.name] = len(result)
@@ -111,60 +133,229 @@ class Compiler:
         expression.apply_traverse(extract_variables)
         return result
 
+    def link(self):
+        for instruction in self.text_segment.instructions:
+            if instruction["opcode"] == Opcode.CALL:
+                symbol = instruction["symbol"]
+                instruction["address"] = self.symbol_table[symbol]
+
+    def compile_root(self, root: RootExpression, global_variables: dict):
+        self.text_segment.put_one({"opcode": Opcode.NOP, "debug": "program start"})
+        for expression in root.expressions:
+            self.compile_expression(expression, global_variables)
+            self.text_segment.put_one({"opcode": Opcode.POP})
+        self.text_segment.put_one({"opcode": Opcode.HALT, "debug": "program end"})
+
+    def compile_function(self, expression: FunctionDefinitionExpression, local_variables: dict[str, dict]):
+        symbol_address = self.text_segment.put_one({
+            "opcode": Opcode.NOP,
+            "debug": "SYMBOL [{}]".format(expression.name)
+        })
+        self.symbol_table[expression.name] = symbol_address
+        for i, e in enumerate(expression.body):
+            self.compile_expression(e, local_variables)
+            if i != len(expression.body):
+                self.text_segment.put_one({"opcode": Opcode.POP})
+        self.text_segment.put_one({"opcode": Opcode.RET})
+        self.text_segment.put_one({
+            "opcode": Opcode.LOAD,
+            "address": {
+                "type": Addressing.RELATIVE,
+                "offset": len(local_variables),  # TODO: +-1? correct?
+                "register": Register.FRAME_POINTER
+            }
+        })
+        self.text_segment.put_one({"opcode": Opcode.POP})
+
     def compile_expression(self, expression: Expression, variables: dict[str,]):
         if isinstance(expression, StringLiteralExpression):
-            self.compile_string_literal(expression, variables)
+            self.compile_string_literal(expression)
         elif isinstance(expression, NumberLiteralExpression):
-            self.compile_number_literal(expression, variables)
+            self.compile_number_literal(expression)
         elif isinstance(expression, VariableValueExpression):
             self.compile_variable_value_expression(expression, variables)
         elif isinstance(expression, VariableAssignmentExpression):
             self.compile_variable_assignment(expression, variables)
         elif isinstance(expression, FunctionCallExpression):
             self.compile_function_call(expression, variables)
+        elif isinstance(expression, LoopExpression):
+            self.compile_loop_expression(expression, variables)
+        elif isinstance(expression, BinaryOperationExpression):
+            self.compile_binary_operator(expression, variables)
+        elif isinstance(expression, UnaryOperatorExpression):
+            self.compile_unary_operator(expression, variables)
+        elif isinstance(expression, ConditionExpression):
+            self.compile_condition(expression, variables)
+        elif isinstance(expression, NullaryOperatorExpression):
+            self.compile_nullary_operator(expression)
+        elif isinstance(expression, AllocationExpression):
+            self.compile_allocation(expression)
         else:
-            assert False, "NOT IMPLEMENTED [{}]".format(expression)
+            assert False, "Not implemented [{}]".format(expression)
 
     def compile_variable_value_expression(self, expression: VariableValueExpression, variables: dict[str,]):
-        lcvariable = {"type": "local",
-                      "name": "a",
-                      "offset": "0"}
-        glvariable = {"type": "global",
-                      "name": "b",
-                      "address": 0x1234}
-        variable = variables[expression.name]
-        if variable["type"] == "local":
-            print("push [{}] % load stack frame".format(variable["offset"]))
-        elif variable["type"] == "global":
-            print("push [{}] % load absolute".format(variable["address"]))
-        else:
-            assert False, "Unknown variable type"
+        address = variables[expression.name]
+        self.text_segment.put_one({
+            "opcode": Opcode.PUSH,
+            "address": address,
+            "debug": "variable value"
+        })
 
-    def compile_number_literal(self, expression: NumberLiteralExpression, variables: dict[str,]):
-        print("push [{}] % number literal".format(expression.value))
+    def compile_number_literal(self, expression: NumberLiteralExpression):
+        self.text_segment.put_one({
+            "opcode": Opcode.PUSH,
+            "address": {
+                "type": Addressing.IMMEDIATE,
+                "value": expression.value
+            },
+            "debug": "number literal"
+        })
 
-    def compile_string_literal(self, expression: StringLiteralExpression, variables: dict[str,]):
-        address = self.data.put_string(expression.value)
-        print("push [{}] % string literal".format(address))
+    def compile_string_literal(self, expression: StringLiteralExpression):
+        address = self.data_segment.put_string(expression.value)
+        self.text_segment.put_one({
+            "opcode": Opcode.PUSH,
+            "address": {
+                "type": Addressing.IMMEDIATE,
+                "value": address
+            },
+            "debug": "string literal"
+        })
 
     def compile_variable_assignment(self, expression: VariableAssignmentExpression, variables: dict[str,]):
-        assert expression.name in variables, "UNKNOWN VARIABLE {}".format(expression.token)
+        assert expression.name in variables, "Unknown variable [{}]".format(expression.token)
         self.compile_expression(expression.value, variables)
-        variable = variables[expression.name]
-        address = "address of {}".format(variable)  # TODO: Implement
-        print("store [{}] % variable assignment".format(address))
+        address = variables[expression.name]
+        self.text_segment.put_one({"opcode": Opcode.STORE, "address": address})
 
     def compile_binary_operator(self, expression: BinaryOperationExpression, variables: dict[str,]):
         self.compile_expression(expression.first, variables)
         self.compile_expression(expression.second, variables)
-        print("{} ; binary operator".format(expression.operator))
-        print("swop")
-        print("swop")
+        binary_operator_opcode = Opcode.from_binary_operator(expression.operator)
+        if binary_operator_opcode == Opcode.STORE:
+            self.text_segment.put_one({
+                "opcode": binary_operator_opcode,
+                "address": {
+                    "type": Addressing.RELATIVE_INDIRECT,
+                }
+            })
+        else:
+            self.text_segment.put_one({"opcode": binary_operator_opcode})
+        self.text_segment.put_one({
+            "opcode": Opcode.LOAD,
+            "address": {
+                "type": Addressing.RELATIVE,
+                "offset": +3,
+                "register": Register.STACK_POINTER
+            }
+        })
+        self.text_segment.put_one({"opcode": Opcode.POP})
+        self.text_segment.put_one({"opcode": Opcode.POP})
+
+    def compile_unary_operator(self, expression: UnaryOperatorExpression, variables: dict[str,]):
+        self.compile_expression(expression.operand, variables)
+        unary_operator_opcode = Opcode.from_unary_operator(expression.operator)
+        if unary_operator_opcode == Opcode.LOAD:
+            self.text_segment.put_one({
+                "opcode": unary_operator_opcode,
+                "address": {
+                    "type": Addressing.RELATIVE_INDIRECT
+                }
+            })
+        else:
+            self.text_segment.put_one({"opcode": unary_operator_opcode})
+        self.text_segment.put_one({
+            "opcode": Opcode.LOAD,
+            "address": {
+                "type": Addressing.RELATIVE,
+                "offset": +2,
+                "register": Register.STACK_POINTER
+            }
+        })
+        self.text_segment.put_one({"opcode": Opcode.POP})
+
+    def compile_nullary_operator(self, expression: NullaryOperatorExpression):
+        nullary_operator_opcode = Opcode.from_nullary_operator(expression.operator)
+        self.text_segment.put_one({"opcode": nullary_operator_opcode})
 
     def compile_function_call(self, expression: FunctionCallExpression, variables: dict[str,]):
+        local_variables = self.functions[expression.name]["variables"]
+        arguments_length = len(expression.arguments)
+        locals_length = len(local_variables) - arguments_length
+        self.text_segment.put_one({
+            "opcode": Opcode.PUSH,
+            "address": {
+                "type": Addressing.IMMEDIATE,
+                "value": 0
+            },
+            "debug": "return value allocation"
+        })
+        for i in range(locals_length):
+            self.text_segment.put_one({
+                "opcode": Opcode.PUSH,
+                "address": {
+                    "type": Addressing.IMMEDIATE,
+                    "value": 0
+                },
+                "debug": "local variable allocation"
+            })
         for argument in expression.arguments:
             self.compile_expression(argument, variables)
-        print("call {} % function name symbol".format(expression.name))
+        self.text_segment.put_one({
+            "opcode": Opcode.CALL,
+            "address": None,
+            "symbol": expression.name
+        })
+        for i in range(locals_length):
+            self.text_segment.put_one({"opcode": Opcode.POP, "debug": "local allocation clear"})
+
+    def compile_loop_expression(self, expression: LoopExpression, variables: dict[str,]):
+        loop_start_address = self.text_segment.put_one({"opcode": Opcode.NOP, "debug": "loop start"})
+        self.compile_expression(expression.condition, variables)
+        loop_after_instruction = {"opcode": Opcode.JZ, "address": None}
+        self.text_segment.put_one(loop_after_instruction)
+        for body_expression in expression.body:
+            self.compile_expression(body_expression, variables)
+            self.text_segment.put_one({"opcode": Opcode.POP})
+        self.text_segment.put_one({
+            "opcode": Opcode.JMP,
+            "address": loop_start_address
+        })
+        loop_after_address = self.text_segment.put_one({"opcode": Opcode.NOP, "debug": "loop after"})
+        loop_after_instruction["address"] = loop_after_address
+
+    def compile_condition(self, expression: ConditionExpression, variables: dict[str,]):
+        self.compile_expression(expression.condition, variables)
+        false_jump = {"opcode": Opcode.JZ, "address": None, "debug": "jump false"}
+        self.text_segment.put_one(false_jump)
+        self.compile_expression(expression.true_expression, variables)
+        true_jump_out = {"opcode": Opcode.JMP, "address": None}
+        self.text_segment.put_one(true_jump_out)
+        false_address = self.text_segment.put_one({"opcode": Opcode.NOP, "debug": "if-false"})
+        self.compile_expression(expression.false_expression, variables)
+        after_address = self.text_segment.put_one({
+            "opcode": Opcode.LOAD,
+            "address": {
+                "type": Addressing.RELATIVE,
+                "offset": +2,
+                "register": Register.STACK_POINTER
+            },
+            "debug": "if-after"
+        })
+        self.text_segment.put_one({"opcode": Opcode.POP})
+        true_jump_out["address"] = after_address
+        false_jump["address"] = false_address
+
+    def compile_allocation(self, expression: AllocationExpression):
+        buffer_address = self.data_segment.allocate(expression.size)
+        self.text_segment.put_one({
+            "opcode": Opcode.PUSH,
+            "address": {
+                "type": Addressing.IMMEDIATE,
+                "value": buffer_address
+            },
+            "debug": "allocation of size: {}".format(expression.size)
+        })
 
 
 def main():
@@ -178,15 +369,31 @@ def main():
             (put (load (+ addr i)))
         )
     )
-    (zero)
-    (defun zero()
-        (setq i (setq j 1))
+    ; cat -- печатать данные, поданные на вход симулятору через файл ввода
+    (setq char (get))
+    (loop (not (= 0 char))      ; EOF == 0
+        (put char)              ; put = print char, get = read char
+        (setq char (get))
     )
-    (zero)
-    (setq a 1)
     (print-str "Hello, world!")
+    (defun is-multiple (n)
+        (or
+            (= 0 (mod n 5))
+            (= 0 (mod n 3))
+        )
+    )
+    (setq sum 0)
+    (setq i 1)
+    (loop (< i 1000)
+        (setq i (- 1 i))
+        (if (is-multiple i) (setq sum (+ sum i)) 0)
+    )
+    (setq buffer2 (alloc 128))
+    (setq buffer1 (alloc 128))
+    (store buffer1 'a')
     """)
 
+    print("============= LEXING ==============")
     tokens = []
     while True:
         token = lex.next()
@@ -194,11 +401,15 @@ def main():
             break
         print(token)
         tokens.append(token)
+    print("============= PARSING ==============")
     ast = Parser(tokens).parse()
     print(ast)
+    print("============= COMPILING ==============")
     compiler = Compiler(ast)
-    print("============= COMPILATION ==============")
     compiler.compile()
+    for i, instruction in enumerate(compiler.text_segment.instructions):
+        print("{:3d}| {}".format(i, instruction))
+    print(compiler.data_segment.data)
 
 
 if __name__ == '__main__':

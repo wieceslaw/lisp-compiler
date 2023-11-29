@@ -2,77 +2,333 @@
 (store <addr> <value>)    -> <value>
 (put <value>)             -> <value>
 (get)                     -> <result>
-(loop <condition> <true> <false>) -> <true> | <false>
-(defun ...)               -> 0
-(setq <varname> <value>)  -> <value>
-(<func> <params>)         -> <result>
 
-(load <expr-address>)
-=
-<expr>          % ... <addr>
-load            % ... <addr> <val>
-swop            % ... <val>
+FLAGS?
+INDIRECT ADDRESSING?
 
-(store <expr-address> <expr-value>)
-=
-<expr>          % ... <addr>
-<expr>          % ... <addr> <val>
-store           % ... <addr> <val>
-swop            % ... <val>
+push <value>
+push <address>
+store % value -> address
 
-(get)
-=
-get             % ... <val>
+(= 1 2)
+(< 1 2) // 1 < 2
+(> 1 2)
+[Overflow, Zero, Sign]
+-------
+push 1 % 1
+push 2 % 1 2
+% operator: <
+cmp    % 1 2 (1 - 2)
+load [flags] % 1 2 0x 0000 0000 0000 0000 0001
+push 1 % 1 2 1 1
+and    % 1 2 1 1 1
+swop x4
 
-(put <expr>)
-=
-<expr>          % ... <val>
-put             % ... <val>
 
-(<bi> <expr-1> <expr-2>)
-=
-<expr>
-<expr>
-<bi>
-swop
-swop
+Трансляция конструкций в машинный код
 
-(if <expr-cond> <expr-true> <expr-false>)
+Трансляция литералов
+```text
+% 1
+.text
 start:
-    <expr>              % ... <expr-cond>
-    jz   false-$hash
-    jnz  true-$hash
-true-$hash:
-    <expr>              % ... <expr-cond> <expr-true>
-    jmp  after-$hash
-false-$hash:
-    <expr>              % ... <expr-cond> <expr-false>
-    jmp  after-$hash
-after-$hash:
-    swop                % ... <expr-true|false>
+    push 0x1
 
 
-stack assembly:
-put     (0: value)
-get
-store   (0: addr, 1: value)
-load    (0: addr)
-lstore  (0: i, 1: value)
-lload   (0: i)
-push <op>
+% "Hello, world!"
+.data
+$hash: "Hello, world!" % pascal-encoded string
+
+.text
+start:
+    push $hash
+```
+
+Трансляция бинарного оператора
+```text
+% (+ 1 2)
+
+.text
+start:
+    push 1      % 1
+    push 2      % 1 2
+    add         % 1 2 3
+    swop        % 1 3
+    swop        % 3
+```
+
+Трансляция условного выражения
+```text
+% (if (= 1 2) 5 20)
+
+.text
+start:
+    ...
+    push 1          % 1
+    push 2          % 1 2
+    eq              % 1 2 0
+    swop            % 1 0
+    swop            % 0
+    jz   false
+true:
+    push 5
+    jmp  after
+false:
+    push 20         % 0 20
+    jmp  after      % 0 20
+after:
+    load $sp + 2    % 20 20
+    pop             % 20
+```
+
+Трансляция функций
+```text
+(defun is-even (n)
+    (= 0 (mod n 2))
+)
+(is-even 5)
+
+.text
+is-even-$hash:          % ... 5
+    push 0              % ... 5 0
+
+    ald 0               % ... 5 0 5
+    push 2              % ... 5 0 5 2
+    mod                 % ... 5 0 5 2 1
+    % очистка после вызова бинарного оператора
+    swop                % ... 5 0 5 1
+    swop                % ... 5 0 1
+
+    eq                  % ... 5 0 1 0
+    % очистка после вызова бинарного оператора
+    swop                % ... 5 0 0
+    swop                % ... 5 0
+
+    % убираем аргументы
+    swop                % ... 0
+    ret
+
+start:
+    % кладем аргументы
+    push 5              % 5
+    call is-even-$hash  % 5
+```
+
+Трансляция присваивания `setq`
+```text
+(setq i 42)
+
+.data
+i$hash: 0
+
+.text
+start:
+    push    42          % вычисление выражения
+    store   [i]         % запись результата по абсолютному адресу глобальной переменной
+    pop                 % так как setq вызывается в глобальном скопе - подчищаем результат
+```
+
+Трансляция цикла loop
+```text
+(loop (< i 10)
+    (print i)
+)
+
+.data
+i$hash: 0
+
+.text
+start:
+
+loop$hash:
+    % вычисление условного выражения начало
+    push    i$hash
+    push    10
+    less
+    swop
+    swop
+    % вычисление условного выражения конец
+
+    jz      after$hash
+
+    % тело цикла начало
+    push i$hash
+    call print
+    pop     % очищаем результат, так как область тела цикла
+    % тело цикла конец
+
+    jmp     loop$hash
+
+after$hash:
+    pop     % цикл, как выражение, возвращает 0 (после вычисления условного выражения)
+            % результат очищаем, так как в глобальной области
+    halt
+```
+
+Инструкции для работы с функциями
+```text
+*Перед вызовом происходит заполнение стека аргументами функции
+
+call <addr>     % выполнить функцию
+    push $sf
+    push $ip
+    jmp  <addr>
+    mov  $fp    % устанавливает stack frame регистр для текущего фрейма
+
+ret % вернуться из функции
+    swap        % поменять местами адрес возврата и результат функции
+    jmp  $sp    % возврат к предыдущей функции
+    pop         % очистить адрес возврата со стека
+    swap        % поменять местами стековый фрейм предыдущего вызова и результат функции
+    mov  $fp    % загрузить frame pointer предыдущее значение
+    pop         % очистить значение со стека
+
+ald <n> % загрузить n-ую локальную переменную исполняемой функции
+    push $fp    % указатель на начало фрейма
+    push <n>
+    sub
+    swop
+    swop        % получить адрес n-ой переменной
+    load        % получить значение по адресу
+    swop        % убрать адрес, оставить значение
+
+ast <n> % сохранить значение в n-ую локальную переменную функции
+    TODO
+```
+
+CPU Pipeline
+```text
+store: indirect relative[sp]:
+2 -> BR
+BR + SP -> DR
+DR -> AR
+MEM[AR] -> DR
+DR -> AC % загрузка адреса
+1 -> BR
+BR + SP -> DR
+DR -> AR
+MEM[AR] -> DR % загрузка значения
+AC -> AR % окончательная загрузка адреса
+I/O: DR -> MEM[AR]
+```
+
+```text
+store: relative[sf + offset]:
+offset -> BR % offset is part of command
+BR + SF -> DR
+DR -> AC % загрузка адреса
+1 -> BR
+BR + SP -> DR % подъем со стека значения для записи
+DR -> AR
+MEM[AR] -> DR % загрузка значения
+AC -> AR % окончательная загрузка адреса
+I/O: DR -> MEM[AR]
+```
+
+```text
+% store: absolute[address]:
+
+address -> AC % TODO: decode command?
+1 -> BR
+BR + SP -> DR % подъем со стека значения для записи
+DR -> AR
+MEM[AR] -> DR % загрузка значения
+AC -> AR % окончательная загрузка адреса
+I/O: DR -> MEM[AR]
+```
+
+```text
+% put
+
+1 -> BR
+BR + SP -> DR
+DR -> AR
+MEM[AR] -> DR % подъем значения
+I/O[IO]: DR -> IO
+```
+
+```text
+% get = get + push
+
+I/O[IO]: IO -> DR % загрузка значения
+DR -> AC
+<push>
+```
+
+```text
+% push <value>
+
+value -> AC % TODO: decode?
+1 -> BR
+BR + SP -> DR
+DR -> AR
+AC -> DR
+I/O[MEM]: DR -> MEM[AR]
+1 + SP -> AC
+AC -> SP
+```
+
+```text
+(= 1 2)
+-------
+push 1
+push 2
+                % EQ
+sub             % 1 2 -1
+not             % 1 2  0
+load $sp - 3    % -1 2 -1
+pop             % -1 2
+pop             % -1
+```
+
+```text
+call <address>:
+IR -> DR?
+DR -> AC
+<push>: AC -> STACK-1
+SF -> AC
+<push>: AC -> STACK-1
+SP -> AC
+AC -> SF
+address -> AC
+AC -> IR % jmp function
+```
+
+```text
+ret:
+<pop>: STACK+1 -> AC
+AC -> SF
+<pop>: STACK+1 -> AC
+AC -> IR % jmp back
+```
+
+```text
+Stack of function call:
+                                   ^
+                                   |
+0xfff8 result                  <- sp, sf
+0xfff9 stack frame address
+0xfffa return address
+0xfffb local 2
+0xfffc local 1
+0xfffd argument 2
+0xfffe argument 1
+0xffff ...
+...
+```
+
+EQ
+sign
+push zero_mask
+and
+load sp + 3
 pop
-swap
-halt
-jz
-jnz
-jl
-jg
-jmp
+pop
 
-add     (0: value, 1: value)
-sub     (0: value, 1: value)
-mul     (0: value, 1: value)
-mod     (0: value, 1: value)
-and     (0: value, 1: value)
-or      (0: value, 1: value)
-not     (0: value)
+LE
+sign
+push positive_mask
+and
+load sp + 3
+pop
+pop

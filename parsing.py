@@ -1,10 +1,10 @@
 from typing import Callable
 
-from lexer import TokenType, Token, operators
+from lexer import TokenType, Token, binary_operators, unary_operators, nullary_operators
 
 
 class Expression:
-    def __init__(self, token: Token | None):
+    def __init__(self, token: Token):
         self.token = token
 
     def children(self) -> list['Expression']:
@@ -162,7 +162,7 @@ class VariableAssignmentExpression(Expression):
 
 
 class BinaryOperationExpression(Expression):
-    def __init__(self, token: Token, operator, first: Expression, second: Expression) -> None:
+    def __init__(self, token: Token, operator: TokenType, first: Expression, second: Expression) -> None:
         super().__init__(token)
         self.operator = operator
         self.first = first
@@ -180,9 +180,37 @@ class BinaryOperationExpression(Expression):
 
 
 class UnaryOperatorExpression(Expression):
-    def __init__(self, token: Token) -> None:
+    def __init__(self, token: Token, operator: TokenType, operand: Expression) -> None:
         super().__init__(token)
-        # TODO: Implement
+        self.operator = operator
+        self.operand = operand
+
+    def __repr__(self) -> str:
+        return 'UNARY OPERATION [OPERATOR: "{}", OPERAND: {}]'.format(self.operator, self.operand)
+
+    def children(self) -> list[Expression]:
+        return [self.operand]
+
+    def apply(self, f: Callable[[Expression], Expression]) -> None:
+        self.operand = f(self.operand)
+
+
+class NullaryOperatorExpression(Expression):
+    def __init__(self, token: Token, operator: TokenType) -> None:
+        super().__init__(token)
+        self.operator = operator
+
+    def __repr__(self) -> str:
+        return 'NULLARY OPERATION [OPERATOR: "{}"]'.format(self.operator)
+
+
+class AllocationExpression(Expression):
+    def __init__(self, token: Token, size: int) -> None:
+        super().__init__(token)
+        self.size = size
+
+    def __repr__(self) -> str:
+        return 'MEMORY ALLOCATION [SIZE: {}]'.format(self.size)
 
 
 class Parser:
@@ -240,14 +268,16 @@ class Parser:
             return self._parse_function_definition()
         elif token.type == TokenType.KEY_SETQ:
             return self._parse_assignment()
-        elif token.type in [TokenType.MOD, TokenType.AND, TokenType.OR, TokenType.PLUS,
-                            TokenType.SUB, TokenType.MUL, TokenType.DIV, TokenType.EQUALS,
-                            TokenType.LESS, TokenType.GREATER]:
+        elif token.type in binary_operators():
             return self._parse_binary_operator()
         elif token.type == TokenType.KEY_LOOP:
             return self._parse_loop_expression()
-        elif token.type == TokenType.NOT:
-            assert False, "Not implemented"  # unary operation
+        elif token.type in unary_operators():
+            return self._parse_unary_operator()
+        elif token.type == TokenType.KEY_ALLOC:
+            return self._parse_allocation()
+        elif token.type in nullary_operators():
+            return self._parse_nullary_operator()
         else:
             assert False, "Unexpected token"
 
@@ -269,7 +299,7 @@ class Parser:
 
     def _parse_function_definition(self) -> Expression:
         token = self._cur_token()
-        assert self._cur_token().type == TokenType.KEY_DEFUN
+        assert token.type == TokenType.KEY_DEFUN
         self._next()
         name = self._cur_token().value
         self._next()
@@ -302,17 +332,40 @@ class Parser:
 
     def _parse_binary_operator(self) -> Expression:
         token = self._cur_token()
-        assert self._cur_token().type in operators()
-        operator = self._cur_token().type.value
+        assert token.type in binary_operators()
+        operator = token.type.value
         self._next()
         first_operand = self._parse_expression()
         second_operand = self._parse_expression()
         return BinaryOperationExpression(token, operator, first_operand, second_operand)
 
+    def _parse_unary_operator(self) -> Expression:
+        token = self._cur_token()
+        assert token.type in unary_operators()
+        operator = token.type.value
+        self._next()
+        operand = self._parse_expression()
+        return UnaryOperatorExpression(token, operator, operand)
+
+    def _parse_nullary_operator(self) -> Expression:
+        token = self._cur_token()
+        assert token.type in nullary_operators()
+        self._next()
+        return NullaryOperatorExpression(token, token.type)
+
     def _parse_loop_expression(self) -> Expression:
         token = self._cur_token()
-        assert self._cur_token().type == TokenType.KEY_LOOP
+        assert token.type == TokenType.KEY_LOOP
         self._next()
         condition = self._parse_expression()
         body = self._parse_expressions()
         return LoopExpression(token, condition, body)
+
+    def _parse_allocation(self) -> Expression:
+        token = self._cur_token()
+        assert token.type == TokenType.KEY_ALLOC
+        self._next()
+        token = self._cur_token()
+        assert token.type == TokenType.NUMBER_LITERAL
+        self._next()
+        return AllocationExpression(token, token.value)
