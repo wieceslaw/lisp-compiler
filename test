@@ -332,3 +332,63 @@ and
 load sp + 3
 pop
 pop
+
+
+
+```text
+Работа с данными:
+store (address) <value> -> None - записать по адресу значение со стека
+load (address) -> <value> - прочитать значение по адресу и положить на стек
+put <value> -> None - прочитать значение со стека и записать во вне
+get -> <value> - получить слово из вне и положить на стек
+push (value) -> <value> - положить литерал на стек
+pop -> None - опустить стек
+
+Вычисление:
+add <operand> <operand> -> <result> - сложить два числа и положить результат на стек
+sub <operand> <operand> -> <result> - вычесть первое число на стеке из второго и положить результат на стек
+mod <operand> <operand> -> <result> TODO
+and <operand> <operand> -> <result> TODO
+or <operand> <operand> -> <result> TODO
+not <operand> <operand> -> <result> TODO
+sign <operand> <operand> -> <result> TODO
+
+Управление потоком исполнения:
+jmp (address) - безусловный переход
+jz (address) <value> - переход, если на стеке находится 0
+call (address) - вызов функции, сохраняет адрес возврата и указатель на текущий фрейм
+ret - возврат из функции
+
+Остальное:
+nop - бездействие, вспомогательная инструкция для упрощения процесса компиляции
+halt - остановка
+```
+
+sadd:
+ld [sp+1]
+add [sp+2]
+st [sp]
+push
+
+sstore A:
+ld [sp+1]
+st [A]
+
+sload A:
+ld [A]
+st [sp+1]
+push
+
+sput X:
+load #X
+put
+st [sp+1]
+push
+
+sjmp A:
+jmp A
+
+sjz A:
+load [sp+1]
+jz A
+
