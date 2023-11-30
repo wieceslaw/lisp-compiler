@@ -121,6 +121,9 @@
 REGISTER: `0` - `Stack Pointer`, `1` - `Stack Frame`
 
 ## Система Команд Процессора
+
+### Набор инструкций
+
 ```text
 add A   - AC + MEM[A] -> AC
 sub A   - AC - MEM[A] -> AC
@@ -145,6 +148,96 @@ ret     - ...
 nop     - no action
 halt    - stop
 ```
+
+### Исполнение инструкций
+```text
+Instruction Fetch
+IMEM[IP] -> CR
+IP + 1 -> IP
+
+Operand Fetch // IF CR.OPCODE IN ADDRESS_COMMANDS
+ABSOLUTE ADDRESS:
+    IMEM[IP] -> BR
+    BR -> AR
+    DMEM[AR] -> DR
+    IP + 1 -> IP
+
+IMMEDIATE:
+    IMEM[IP] -> BR
+    BR -> DR
+    IP + 1 -> IP
+
+RELATIVE (reg):
+    IMEM[IP] -> BR
+    BR + reg -> AR
+    DMEM[AR] -> DR
+    IP + 1 -> IP
+    
+RELATIVE INDIRECT:
+    IMEM[IP] -> BR
+    BR + reg -> AR
+    DMEM[AR] -> AR
+    DMEM[AR] -> DR
+    IP + 1 -> IP
+
+Execution:
+add, sub, mod, and, or:
+    AC + DR -> AC
+
+not:
+    ~AC -> AC
+
+jmp:
+    DR -> IR
+
+jz:
+    DR -> IR, if FLAGS[ZERO] == 1
+
+call:
+    DR -> BR
+    IP -> DR % PUSH IP
+    SP -> AR
+    DR -> DMEM[AR]
+    SP - 1 -> SP
+    FP -> DR % PUSH FP
+    SP -> AR
+    DR -> DMEM[AR]
+    SP - 1 -> SP
+    BR -> IR
+
+ret:
+    SP + 1 -> SP % POP FP
+    SP -> AR
+    DMEM[AR] -> DR
+    DR -> FP
+    SP + 1 -> SP % POP IP
+    SP -> AR
+    DMEM[AR] -> DR
+    DR -> IP
+    
+ld:
+    DR -> AR
+    DMEM[AR] -> DR
+    DR -> AC
+    
+st:
+    DR -> AR
+    AC -> DR
+    DR -> DMEM[AR]
+ 
+push:
+    SP - 1 -> SP
+ 
+pop:
+    SP + 1 -> SP
+
+TODO:
+put     - AC -> IO
+get     - IO -> AC
+flags   - FL -> AC
+```
+
+
 
 ```text
 Работа с данными:

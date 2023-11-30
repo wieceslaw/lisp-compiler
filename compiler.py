@@ -1,3 +1,5 @@
+import random
+
 from isa import Opcode, Addressing, Register
 from lexer import Lexer
 from parsing import *
