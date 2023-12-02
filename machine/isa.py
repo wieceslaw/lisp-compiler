@@ -8,7 +8,6 @@ class Opcode(str, Enum):
     AND = "and"
     OR = "or"
     NOT = "not"
-    FLAGS = "flags"
     LD = "ld"
     ST = "st"
     PUT = "put"
@@ -19,6 +18,9 @@ class Opcode(str, Enum):
     JZ = "jz"
     CALL = "call"
     RET = "ret"
+    ISPOS = "ispos"
+    ISNEG = "isneg"
+    ISZERO = "iszero"
     NOP = "nop"
     HALT = "halt"
 
