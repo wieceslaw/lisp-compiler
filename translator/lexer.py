@@ -12,8 +12,6 @@ class TokenType(str, Enum):
 
     PLUS = "T_PLUS"  # +
     SUB = "T_SUB"  # -
-    # MUL = "T_MUL"  # *
-    # DIV = "T_DIV"  # /
     EQUALS = "T_EQUALS"  # =
     LESS = "T_LESS"  # <
     GREATER = "T_GREATER"  # >
@@ -43,8 +41,6 @@ tokens = [
     (r"\)", TokenType.CLOSE_BRACKET),
     (r"\+", TokenType.PLUS),
     (r"-", TokenType.SUB),
-    # (r"\*", TokenType.MUL),
-    # (r"/", TokenType.DIV),
     (r"=", TokenType.EQUALS),
     (r"<", TokenType.LESS),
     (r">", TokenType.GREATER),
@@ -77,8 +73,6 @@ def binary_operators():
         TokenType.OR,
         TokenType.PLUS,
         TokenType.SUB,
-        # TokenType.MUL,
-        # TokenType.DIV,
         TokenType.EQUALS,
         TokenType.LESS,
         TokenType.GREATER,

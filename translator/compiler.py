@@ -1,18 +1,16 @@
-import random
-
-from isa import Opcode, Addressing, Register
+from machine.isa import Opcode, Addressing, Register
 from lexer import Lexer
 from parsing import *
 
 
 class DataSegment:
-    def __init__(self, size):
-        self.size = size
+    def __init__(self, capacity):
+        self.capacity = capacity
         self.cur = 0
-        self.data = [0] * size
+        self.data = [0] * capacity
 
     def put_string(self, string: str) -> int:
-        assert self.size - self.cur >= len(string), "Out of memory"
+        assert self.capacity - self.cur >= len(string), "Out of data memory"
         ref = self.cur
         self.data[self.cur] = len(string)
         self.cur += 1
@@ -21,14 +19,15 @@ class DataSegment:
         self.cur += len(string)
         return ref
 
-    def put_variable(self) -> int:
-        assert self.size - self.cur >= 1
+    def put_word(self, value: int = 0) -> int:
+        assert self.capacity - self.cur >= 1
+        self.data[self.cur] = value
         ref = self.cur
         self.cur += 1
         return ref
 
     def allocate(self, size: int) -> int:
-        assert self.size - self.cur >= size, "Out of memory"
+        assert self.capacity - self.cur >= size, "Out of data memory"
         ref = self.cur
         self.cur += size
         return ref
@@ -38,16 +37,20 @@ class DataSegment:
 
 
 class TextSegment:
-    # TODO: Out of memory (add size)
-    def __init__(self):
+    def __init__(self, capacity: int):
         self.instructions = []
+        self.capacity = capacity
 
     def put_one(self, instruction: dict) -> int:
+        new_size = len(self.instructions) + 1
+        assert new_size <= self.capacity, "Out of instruction memory"
         address = len(self.instructions)
         self.instructions.append(instruction)
         return address
 
     def put_many(self, instructions: list[dict]) -> int:
+        new_size = len(self.instructions) + len(instructions)
+        assert new_size <= self.capacity, "Out of instruction memory"
         address = len(self.instructions)
         for instruction in instructions:
             self.put_one(instruction)
@@ -56,7 +59,7 @@ class TextSegment:
 
 class Compiler:
     def __init__(self, root: RootExpression):
-        self.text_segment = TextSegment()
+        self.text_segment = TextSegment(4096)
         self.data_segment = DataSegment(4096)
         self.functions = self.preprocess_functions(root)
         self.root = self.preprocess_root(root)
@@ -75,7 +78,7 @@ class Compiler:
         variable_index = self.collect_variables(root, {})
         variables = {}
         for name in variable_index:
-            address = self.data_segment.put_variable()
+            address = self.data_segment.put_word()
             variables[name] = {
                 "type": Addressing.ABSOLUTE,
                 "debug": "variable name: {}".format(name),
@@ -148,28 +151,39 @@ class Compiler:
             self.text_segment.put_one({"opcode": Opcode.POP})
         self.text_segment.put_one({"opcode": Opcode.HALT, "debug": "program end"})
 
-    def compile_function(self, expression: FunctionDefinitionExpression, local_variables: dict[str, dict]):
-        symbol_address = self.text_segment.put_one({
+    def compile_function(self, expression: FunctionDefinitionExpression, variables: dict[str, dict]):
+        # TODO: Refactor, remove variable lengths and dicts
+        function_address = self.text_segment.put_one({
             "opcode": Opcode.NOP,
             "debug": "SYMBOL [{}]".format(expression.name)
         })
-        self.symbol_table[expression.name] = symbol_address
+        self.symbol_table[expression.name] = function_address
+        local_variables_length = len(variables) - len(expression.parameters)
+        for i in range(local_variables_length):
+            self.text_segment.put_one({
+                "opcode": Opcode.PUSH,
+                "debug": "allocating local variable [{}]".format(i)
+            })
+        if len(expression.body) == 0:
+            self.text_segment.put_one({"opcode": Opcode.PUSH, "debug": "garbage push"})
         for i, e in enumerate(expression.body):
-            self.compile_expression(e, local_variables)
+            self.compile_expression(e, variables)
             if i != len(expression.body):
                 self.text_segment.put_one({"opcode": Opcode.POP})
-        self.text_segment.put_one({"opcode": Opcode.RET})
         self.text_segment.put_one({
-            "opcode": Opcode.LOAD,
-            "address": {
+            "opcode": Opcode.LD,
+            "operand": {
                 "type": Addressing.RELATIVE,
-                "offset": len(local_variables),  # TODO: +-1? correct?
-                "register": Register.FRAME_POINTER
-            }
+                "register": Register.STACK_POINTER,
+                "offset": +1
+            },
+            "debug": "save result"
         })
-        self.text_segment.put_one({"opcode": Opcode.POP})
+        for i in range(local_variables_length):
+            self.text_segment.put_one({"opcode": Opcode.POP, "debug": "clearing local variable [{}]".format(i)})
+        self.text_segment.put_one({"opcode": Opcode.RET})
 
-    def compile_expression(self, expression: Expression, variables: dict[str,]):
+    def compile_expression(self, expression: Expression, variables: dict[str]):
         if isinstance(expression, StringLiteralExpression):
             self.compile_string_literal(expression)
         elif isinstance(expression, NumberLiteralExpression):
@@ -195,169 +209,266 @@ class Compiler:
         else:
             assert False, "Not implemented [{}]".format(expression)
 
-    def compile_variable_value_expression(self, expression: VariableValueExpression, variables: dict[str,]):
-        address = variables[expression.name]
+    def compile_variable_value_expression(self, expression: VariableValueExpression, variables: dict[str]):
+        variable_address = variables[expression.name]
         self.text_segment.put_one({
-            "opcode": Opcode.PUSH,
-            "address": address,
-            "debug": "variable value"
+            "opcode": Opcode.LD,
+            "operand": variable_address,
+            "debug": "allocate for variable [{}]".format(expression.name)
+        })
+        self.text_segment.put_one({"opcode": Opcode.PUSH})
+        self.text_segment.put_one({
+            "opcode": Opcode.ST,
+            "operand": {
+                "type": Addressing.RELATIVE,
+                "register": Register.STACK_POINTER,
+                "offset": +1
+            }
         })
 
     def compile_number_literal(self, expression: NumberLiteralExpression):
+        static_address = self.data_segment.put_word(expression.value)
         self.text_segment.put_one({
-            "opcode": Opcode.PUSH,
-            "address": {
-                "type": Addressing.IMMEDIATE,
-                "value": expression.value
+            "opcode": Opcode.LD,
+            "operand": {
+                "type": Addressing.ABSOLUTE,
+                "address": static_address
             },
             "debug": "number literal"
         })
+        self.text_segment.put_one({"opcode": Opcode.PUSH})
+        self.text_segment.put_one({
+            "opcode": Opcode.ST,
+            "operand": {
+                "type": Addressing.RELATIVE,
+                "register": Register.STACK_POINTER,
+                "offset": +1
+            }
+        })
 
     def compile_string_literal(self, expression: StringLiteralExpression):
-        address = self.data_segment.put_string(expression.value)
+        static_address = self.data_segment.put_string(expression.value)
         self.text_segment.put_one({
-            "opcode": Opcode.PUSH,
-            "address": {
-                "type": Addressing.IMMEDIATE,
-                "value": address
+            "opcode": Opcode.LD,
+            "operand": {
+                "type": Addressing.ABSOLUTE,
+                "address": static_address
             },
             "debug": "string literal"
         })
+        self.text_segment.put_one({"opcode": Opcode.PUSH})
+        self.text_segment.put_one({
+            "opcode": Opcode.ST,
+            "operand": {
+                "type": Addressing.RELATIVE,
+                "register": Register.STACK_POINTER,
+                "offset": +1
+            }
+        })
 
-    def compile_variable_assignment(self, expression: VariableAssignmentExpression, variables: dict[str,]):
+    def compile_variable_assignment(self, expression: VariableAssignmentExpression, variables: dict[str]):
         assert expression.name in variables, "Unknown variable [{}]".format(expression.token)
         self.compile_expression(expression.value, variables)
-        address = variables[expression.name]
-        self.text_segment.put_one({"opcode": Opcode.STORE, "address": address})
-
-    def compile_binary_operator(self, expression: BinaryOperationExpression, variables: dict[str,]):
-        self.compile_expression(expression.first, variables)
-        self.compile_expression(expression.second, variables)
-        binary_operator_opcode = Opcode.from_binary_operator(expression.operator)
-        if binary_operator_opcode == Opcode.STORE:
-            self.text_segment.put_one({
-                "opcode": binary_operator_opcode,
-                "address": {
-                    "type": Addressing.RELATIVE_INDIRECT,
-                }
-            })
-        else:
-            self.text_segment.put_one({"opcode": binary_operator_opcode})
         self.text_segment.put_one({
-            "opcode": Opcode.LOAD,
-            "address": {
+            "opcode": Opcode.LD,
+            "operand": {
                 "type": Addressing.RELATIVE,
-                "offset": +3,
-                "register": Register.STACK_POINTER
+                "register": Register.STACK_POINTER,
+                "offset": +1
             }
         })
-        self.text_segment.put_one({"opcode": Opcode.POP})
-        self.text_segment.put_one({"opcode": Opcode.POP})
-
-    def compile_unary_operator(self, expression: UnaryOperatorExpression, variables: dict[str,]):
-        self.compile_expression(expression.operand, variables)
-        unary_operator_opcode = Opcode.from_unary_operator(expression.operator)
-        if unary_operator_opcode == Opcode.LOAD:
-            self.text_segment.put_one({
-                "opcode": unary_operator_opcode,
-                "address": {
-                    "type": Addressing.RELATIVE_INDIRECT
-                }
-            })
-        else:
-            self.text_segment.put_one({"opcode": unary_operator_opcode})
+        variable_address = variables[expression.name]
         self.text_segment.put_one({
-            "opcode": Opcode.LOAD,
-            "address": {
-                "type": Addressing.RELATIVE,
-                "offset": +2,
-                "register": Register.STACK_POINTER
-            }
+            "opcode": Opcode.ST,
+            "operand": variable_address
         })
-        self.text_segment.put_one({"opcode": Opcode.POP})
 
-    def compile_nullary_operator(self, expression: NullaryOperatorExpression):
-        nullary_operator_opcode = Opcode.from_nullary_operator(expression.operator)
-        self.text_segment.put_one({"opcode": nullary_operator_opcode})
-
-    def compile_function_call(self, expression: FunctionCallExpression, variables: dict[str,]):
-        local_variables = self.functions[expression.name]["variables"]
-        arguments_length = len(expression.arguments)
-        locals_length = len(local_variables) - arguments_length
+    def compile_allocation(self, expression: AllocationExpression):
+        buffer_address = self.data_segment.allocate(expression.size)
+        static_address = self.data_segment.put_word(buffer_address)
+        self.text_segment.put_one({"opcode": Opcode.PUSH, "debug": "allocation of size: {}".format(expression.size)})
         self.text_segment.put_one({
-            "opcode": Opcode.PUSH,
-            "address": {
-                "type": Addressing.IMMEDIATE,
-                "value": 0
+            "opcode": Opcode.LD,
+            "operand": {
+                "type": Addressing.ABSOLUTE,
+                "address": static_address
             },
-            "debug": "return value allocation"
         })
-        for i in range(locals_length):
-            self.text_segment.put_one({
-                "opcode": Opcode.PUSH,
-                "address": {
-                    "type": Addressing.IMMEDIATE,
-                    "value": 0
-                },
-                "debug": "local variable allocation"
-            })
+
+    def compile_function_call(self, expression: FunctionCallExpression, variables: dict[str]):
         for argument in expression.arguments:
             self.compile_expression(argument, variables)
         self.text_segment.put_one({
             "opcode": Opcode.CALL,
-            "address": None,
-            "symbol": expression.name
+            "operand": None,
+            "symbol": expression.name,
+            "debug": "function call {}".format(expression.name)
         })
-        for i in range(locals_length):
+        for i in range(len(expression.arguments)):
             self.text_segment.put_one({"opcode": Opcode.POP, "debug": "local allocation clear"})
+        self.text_segment.put_one({"opcode": Opcode.PUSH})
+        self.text_segment.put_one({
+            "opcode": Opcode.ST,
+            "operand": {
+                "type": Addressing.RELATIVE,
+                "register": Register.STACK_POINTER,
+                "offset": +1
+            }
+        })
 
-    def compile_loop_expression(self, expression: LoopExpression, variables: dict[str,]):
+    def compile_binary_operator(self, expression: BinaryOperationExpression, variables: dict[str]):
+        self.compile_expression(expression.first, variables)
+        self.compile_expression(expression.second, variables)
+        binary_opcode = Opcode.from_binary_operator(expression.operator)
+        if binary_opcode == Opcode.ST:
+            self.text_segment.put_one({
+                "opcode": Opcode.LD,
+                "operand": {
+                    "type": Addressing.RELATIVE,
+                    "register": Register.STACK_POINTER,
+                    "offset": +1
+                },
+                "debug": "load value"
+            })
+            self.text_segment.put_one({
+                "opcode": binary_opcode,
+                "operand": {
+                    "type": Addressing.RELATIVE_INDIRECT,
+                    "register": Register.STACK_POINTER,
+                    "offset": +2
+                },
+                "debug": "store value"
+            })
+        else:
+            first_operand = {
+                "type": Addressing.RELATIVE,
+                "register": Register.STACK_POINTER,
+                "offset": +2
+            }
+            second_operand = {
+                "type": Addressing.RELATIVE,
+                "register": Register.STACK_POINTER,
+                "offset": +1
+            }
+            self.text_segment.put_one({
+                "opcode": Opcode.LD,
+                "operand": first_operand,
+                "debug": "load value"
+            })
+            self.text_segment.put_one({
+                "opcode": binary_opcode,
+                "operand": second_operand,
+                "debug": "store value"
+            })
+        self.text_segment.put_one({"opcode": Opcode.POP})
+        self.text_segment.put_one({
+            "opcode": Opcode.ST,
+            "operand": {
+                "type": Addressing.RELATIVE,
+                "register": Register.STACK_POINTER,
+                "offset": +1
+            },
+            "debug": "put result of binary operator"
+        })
+
+    def compile_unary_operator(self, expression: UnaryOperatorExpression, variables: dict[str]):
+        self.compile_expression(expression.operand, variables)
+        unary_opcode = Opcode.from_unary_operator(expression.operator)
+        if unary_opcode == Opcode.LD:
+            self.text_segment.put_one({
+                "opcode": unary_opcode,
+                "operand": {
+                    "type": Addressing.RELATIVE_INDIRECT,
+                    "register": Register.STACK_POINTER,
+                    "offset": +1
+                },
+                "debug": "load operation"
+            })
+        else:
+            self.text_segment.put_one({
+                "opcode": unary_opcode,
+                "operand": {
+                    "type": Addressing.RELATIVE,
+                    "register": Register.STACK_POINTER,
+                    "offset": +1
+                },
+                "debug": "load operation"
+            })
+        self.text_segment.put_one({
+            "opcode": Opcode.ST,
+            "operand": {
+                "type": Addressing.RELATIVE,
+                "register": Register.STACK_POINTER,
+                "offset": +1
+            },
+            "debug": "put result of unary operator"
+        })
+
+    def compile_nullary_operator(self, expression: NullaryOperatorExpression):
+        self.text_segment.put_one({"opcode": Opcode.PUSH, "debug": "allocate for nullary operation"})
+        if expression.operator == TokenType.KEY_GET:
+            self.text_segment.put_one({"opcode": Opcode.GET})
+        else:
+            assert False, "Unknown nullary operator"
+        self.text_segment.put_one({
+            "opcode": Opcode.ST,
+            "operand": {
+                "type": Addressing.RELATIVE,
+                "register": Register.STACK_POINTER,
+                "offset": +1
+            },
+            "debug": "put result of nullary operator"
+        })
+
+    def compile_loop_expression(self, expression: LoopExpression, variables: dict[str]):
         loop_start_address = self.text_segment.put_one({"opcode": Opcode.NOP, "debug": "loop start"})
         self.compile_expression(expression.condition, variables)
-        loop_after_instruction = {"opcode": Opcode.JZ, "address": None}
+        self.text_segment.put_one({
+            "opcode": Opcode.LD,
+            "operand": {
+                "type": Addressing.RELATIVE,
+                "register": Register.STACK_POINTER,
+                "offset": +1
+            }
+        })
+        loop_after_instruction = {"opcode": Opcode.JZ, "operand": None, "debug": "jump out of loop"}
         self.text_segment.put_one(loop_after_instruction)
         for body_expression in expression.body:
             self.compile_expression(body_expression, variables)
             self.text_segment.put_one({"opcode": Opcode.POP})
-        self.text_segment.put_one({
-            "opcode": Opcode.JMP,
-            "address": loop_start_address
-        })
+        self.text_segment.put_one({"opcode": Opcode.JMP, "operand": loop_start_address, "debug": "jump loop begin"})
         loop_after_address = self.text_segment.put_one({"opcode": Opcode.NOP, "debug": "loop after"})
         loop_after_instruction["address"] = loop_after_address
 
-    def compile_condition(self, expression: ConditionExpression, variables: dict[str,]):
+    def compile_condition(self, expression: ConditionExpression, variables: dict[str]):
         self.compile_expression(expression.condition, variables)
-        false_jump = {"opcode": Opcode.JZ, "address": None, "debug": "jump false"}
+        self.text_segment.put_one({
+            "opcode": Opcode.LD,
+            "operand": {
+                "type": Addressing.RELATIVE,
+                "register": Register.STACK_POINTER,
+                "offset": +1
+            }
+        })
+        false_jump = {"opcode": Opcode.JZ, "address": None, "debug": "jump if false"}
         self.text_segment.put_one(false_jump)
         self.compile_expression(expression.true_expression, variables)
         true_jump_out = {"opcode": Opcode.JMP, "address": None}
         self.text_segment.put_one(true_jump_out)
-        false_address = self.text_segment.put_one({"opcode": Opcode.NOP, "debug": "if-false"})
+        false_address = self.text_segment.put_one({"opcode": Opcode.NOP, "debug": "if false"})
         self.compile_expression(expression.false_expression, variables)
         after_address = self.text_segment.put_one({
-            "opcode": Opcode.LOAD,
+            "opcode": Opcode.LD,
             "address": {
                 "type": Addressing.RELATIVE,
                 "offset": +2,
                 "register": Register.STACK_POINTER
             },
-            "debug": "if-after"
+            "debug": "after if"
         })
         self.text_segment.put_one({"opcode": Opcode.POP})
         true_jump_out["address"] = after_address
         false_jump["address"] = false_address
-
-    def compile_allocation(self, expression: AllocationExpression):
-        buffer_address = self.data_segment.allocate(expression.size)
-        self.text_segment.put_one({
-            "opcode": Opcode.PUSH,
-            "address": {
-                "type": Addressing.IMMEDIATE,
-                "value": buffer_address
-            },
-            "debug": "allocation of size: {}".format(expression.size)
-        })
 
 
 def main():
