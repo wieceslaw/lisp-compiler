@@ -36,7 +36,7 @@ class TokenType(str, Enum):
         return self.value
 
 
-tokens = [
+tokens_patterns = [
     (r"\(", TokenType.OPEN_BRACKET),
     (r"\)", TokenType.CLOSE_BRACKET),
     (r"\+", TokenType.PLUS),
@@ -60,10 +60,10 @@ tokens = [
     (r"'.'", TokenType.CHARACTER_LITERAL),
     (r'"(.*)"', TokenType.STRING_LITERAL),
     (r"[0-9]+", TokenType.NUMBER_LITERAL),
-    (r"[a-zA-Z]\w*", TokenType.VARNAME),
+    (r"[a-zA-Z\.]\w*", TokenType.VARNAME),
 ]
-assert len(tokens) == len([i for i in TokenType])  # assert that all cases are matched
-tokens = [(re.compile(pattern), ttype) for pattern, ttype in tokens]  # compile patterns
+assert len(tokens_patterns) == len([i for i in TokenType])  # assert that all cases are matched
+tokens_patterns = [(re.compile(pattern), ttype) for pattern, ttype in tokens_patterns]  # compile patterns
 
 
 def binary_operators():
@@ -98,7 +98,7 @@ class Token:
     def __init__(self, token, line, offset):
         self.type = None
         self.value = None
-        for pattern, token_type in tokens:
+        for pattern, token_type in tokens_patterns:
             match = pattern.match(token)
             if match:
                 self.type = token_type
@@ -127,6 +127,15 @@ class Lexer:
         self.text = text
         self.line = 0
         self.offset = 0
+
+    def tokenize(self) -> list[Token]:
+        tokens = []
+        while True:
+            token = self.next()
+            if token is None:
+                break
+            tokens.append(token)
+        return tokens
 
     def next(self) -> Token:
         if self._skip_empty():

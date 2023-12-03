@@ -1,7 +1,7 @@
 ; cat -- печатать данные, поданные на вход симулятору через файл ввода
 
 (setq char (get))
-(loop (not (= 0 char))      ; EOF == 0
+(loop (is-not (= 0 char))      ; EOF == 0
     (put char)              ; put = print char, get = read char
     (setq char (get))
 )

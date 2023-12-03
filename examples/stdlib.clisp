@@ -1,18 +1,70 @@
+; вспомогательная функция для объединения выражений
+(defun .(x, y))
+
+; инвертировать число
+(defun neg(n)
+    (+ 1 (not n))
+)
+
+; логическое нет
+(defun is-not(b)
+    (if (= b 0) 1 0)
+)
+
+; целочисленное деление n на d
+(defun div(n d)
+    (setq negative (< n 0))
+    (if negative
+        (setq n (neg n))
+        0                       ; skip "else" branch
+    )                           ; temporary change sign
+    (setq r n)
+    (setq q 0)
+    (loop (or (> r d) (= r d))
+        (setq r (- r d))
+        (setq q (+ 1 q))
+    )
+    (if negative (neg q) q)     ; return sign
+)
+
+; вывести число n (используется рекурсия для вывода цифр в корректном порядке)
+(defun print-num(n)
+    (if (= n 0)
+        0 ; return from recursion
+        (. (.
+            (if (< n 0)
+                (. (setq n (neg n)) (put '-'))
+                0
+            )
+            (print-num (div n 10))) ; goto recursion
+            (put (mod n 10))
+        )
+    )
+)
+
+; вывести строку по адресу addr
 (defun print(addr)
     (setq len (load addr))
     (setq i 0)
-    (loop (>= len i)
+    (loop (or (> len i) (= len i))
         (setq i (+ i 1))
         (put (load (+ addr i)))
     )
 )
 
-(defun print-num(n)
-    ; вывести число
-    '1' '2' '3' '4' ;
-)
-
-(defun read(addr, n)
-    (store addr n)
-    ; прочитать (максимум) n символов в буфер по адресу (сформировать Pascal-строку)
+; прочитать (максимум) n символов с ввода в буфер по адресу (сформировать Pascal-строку)
+(defun read(addr n)
+    (setq len 0)
+    (setq ptr (+ 1 addr))
+    (setq char 0)
+    (loop (and
+            (is-not (= 0 (setq char (get)))) ; input == EOF
+            (< (+ len 1) n)                  ; not out of buffer
+        )
+        (store ptr char)                     ; write char
+        (setq ptr (+ 1 ptr))                 ; move ptr
+        (setq len (+ 1 len))                 ; increment len
+    )
+    (store addr len)                         ; write string length
+    len ; return length of string
 )

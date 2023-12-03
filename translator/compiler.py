@@ -1,11 +1,10 @@
 from machine.isa import Opcode, Addressing, Register
-from lexer import Lexer
 from parsing import *
 
 
 def unary_operators() -> dict[TokenType, Opcode]:
     return {
-        TokenType.NOT: Opcode.ISZERO,
+        TokenType.NOT: Opcode.NOT,
         TokenType.KEY_LOAD: Opcode.LD,
         TokenType.KEY_PUT: Opcode.PUT
     }
@@ -73,6 +72,7 @@ class TextSegment:
         address = len(self.instructions)
         if debug:
             instruction["debug"] = debug
+        instruction["index"] = len(self.instructions)
         self.instructions.append(instruction)
         return address
 
@@ -136,9 +136,9 @@ class Compiler:
         self.symbol_table = {}
 
     def compile(self):
+        self._compile_root(self.root, self._root_variables(self.root))
         for function in self.functions.values():
             self._compile_function(function, self._function_variables(function))
-        self._compile_root(self.root, self._root_variables(self.root))
         self._link()
 
     def _root_variables(self, root: RootExpression) -> dict[str, dict]:
@@ -148,7 +148,7 @@ class Compiler:
             address = self.data.put_word()
             variables[name] = {
                 "type": Addressing.ABSOLUTE,
-                "value": address,
+                "address": address,
             }
         return variables
 
@@ -216,7 +216,7 @@ class Compiler:
         self.symbol_table[expression.name] = function_address
         local_variables_length = len(variables) - len(expression.parameters)
         for i in range(local_variables_length):
-            self.text.write_push(debug="allocating local variable [{}]".format(i))
+            self.text.write_push(debug="allocate local variable [{}]".format(i))
         if len(expression.body) == 0:
             self.text.write_push(debug="garbage push")
         for i, e in enumerate(expression.body):
@@ -224,8 +224,9 @@ class Compiler:
             if i != len(expression.body):
                 self.text.write_pop()
         self.text.write_stack_load(debug="save result")
+        self.text.write_pop("clear result")
         for i in range(local_variables_length):
-            self.text.write_pop(debug="clearing local variable [{}]".format(i))
+            self.text.write_pop(debug="clear local variable [{}]".format(i))
         self.text.write_instruction({"opcode": Opcode.RET})
 
     def _compile_expression(self, expression: Expression, variables: dict[str]):
@@ -443,10 +444,10 @@ class Compiler:
 
     def _compile_nullary_operator(self, expression: NullaryOperatorExpression):
         if expression.operator == TokenType.KEY_GET:
-            self.text.write_instruction({"opcode": Opcode.GET})
+            self.text.write_instruction({"opcode": Opcode.GET}, debug="nullary operator")
         else:
             assert False, "Unknown nullary operator"
-        self.text.write_accumulator_push(debug="nullary operator result")
+        self.text.write_accumulator_push()
 
     def _compile_loop_expression(self, expression: LoopExpression, variables: dict[str]):
         loop_start_address = self.text.write_nop(debug="loop start")
@@ -482,38 +483,3 @@ class Compiler:
         self.text.write_pop()
         true_jump_out["operand"] = after_address
         false_jump["operand"] = false_address
-
-
-def main():
-    lex = Lexer("""
-    (defun print-str(addr)
-        (setq len (load addr))
-        (setq i 0)
-        (loop (not (= len i))
-            (setq i (+ i 1))
-            (put (load (+ addr i)))
-        )
-    )
-    """)
-
-    print("============= LEXING ==============")
-    tokens = []
-    while True:
-        token = lex.next()
-        if token is None:
-            break
-        print(token)
-        tokens.append(token)
-    print("============= PARSING ==============")
-    ast = Parser(tokens).parse()
-    print(ast)
-    print("============= COMPILING ==============")
-    compiler = Compiler(ast, 1024, 1024)
-    compiler.compile()
-    for i, instruction in enumerate(compiler.text.instructions):
-        print("{:3d}| {}".format(i, instruction))
-    print("STATIC DATA:", compiler.data.layout())
-
-
-if __name__ == '__main__':
-    main()
