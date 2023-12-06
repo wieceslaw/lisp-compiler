@@ -13,7 +13,12 @@ STDLIB_FILE = "examples/stdlib.clisp"
 
 def write_code(filename: str, instruction_code: list[dict], static_data: list[int]):
     with open(filename, "w", encoding="utf-8") as file:
-        json.dump({"code": instruction_code, "data": static_data}, file, indent=4)
+        buf = []
+        for instr in instruction_code:
+            buf.append(json.dumps(instr))
+        code = "[" + ",\n ".join(buf) + "]"
+        data = json.dumps(static_data)
+        file.write("{" + '"code": ' + code + ',\n "data": ' + data + "}")
 
 
 def read_code(filename: str) -> tuple[list[dict], list[int]]:
@@ -22,11 +27,14 @@ def read_code(filename: str) -> tuple[list[dict], list[int]]:
         # TODO: deserialize Addressing and Register
         for instruction in code:
             instruction["opcode"] = Opcode(instruction["opcode"])
+            if "operand" in instruction:
+                operand = instruction["operand"]
+
+
     return code["code"], code["data"]
 
 
 def translate(source_code: str) -> tuple[list[dict], list[int]]:
-    # TODO: append standard library
     lex = Lexer(source_code)
     tokens = lex.tokenize()
     ast = Parser(tokens).parse()

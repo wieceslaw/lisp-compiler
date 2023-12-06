@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "clisp"
 version = "0.0.1"
-description = "An example project for Computer System Architecture class."
+description = "A third assignment work for Computer System Architecture class."
 authors = ["Vyacheslav Lebedev <vyacheslav.v.lebedev@gmail.com>"]
 license = "BSD"
 readme = "README.md"

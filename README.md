@@ -69,7 +69,7 @@ TODO:
 
 <character-literal>     := '.'
 
-<varname>               := [a-zA-Z]\w*
+<varname>               := [a-zA-Z\.]\w*
 ```
 
 ### Семантика
@@ -460,6 +460,7 @@ iszero:
   111
 ]
 ```
+![img.png](images/img.png)
 
 ## Транслятор
 
