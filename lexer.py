@@ -75,22 +75,16 @@ def binary_operators():
         TokenType.EQUALS,
         TokenType.LESS,
         TokenType.GREATER,
-        TokenType.KEY_STORE
+        TokenType.KEY_STORE,
     }
 
 
 def unary_operators():
-    return {
-        TokenType.NOT,
-        TokenType.KEY_LOAD,
-        TokenType.KEY_PUT
-    }
+    return {TokenType.NOT, TokenType.KEY_LOAD, TokenType.KEY_PUT}
 
 
 def nullary_operators():
-    return {
-        TokenType.KEY_GET
-    }
+    return {TokenType.KEY_GET}
 
 
 class Token:

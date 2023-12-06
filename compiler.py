@@ -21,11 +21,7 @@ from parsing import (
 
 
 def unary_operators() -> dict[TokenType, Opcode]:
-    return {
-        TokenType.NOT: Opcode.NOT,
-        TokenType.KEY_LOAD: Opcode.LD,
-        TokenType.KEY_PUT: Opcode.PUT
-    }
+    return {TokenType.NOT: Opcode.NOT, TokenType.KEY_LOAD: Opcode.LD, TokenType.KEY_PUT: Opcode.PUT}
 
 
 def comparison_operators() -> dict[TokenType, Opcode]:
@@ -75,7 +71,7 @@ class DataSegment:
         return ref
 
     def layout(self) -> list:
-        return self._data[:self._cur]
+        return self._data[: self._cur]
 
 
 class TextSegment:
@@ -106,25 +102,22 @@ class TextSegment:
 
     def write_accumulator_push(self, debug: str | None = None):
         address = self.write_push(debug)
-        self.write_instruction({
-            "opcode": Opcode.ST,
-            "operand": {
-                "type": Addressing.RELATIVE,
-                "register": Register.STACK_POINTER,
-                "offset": +1
+        self.write_instruction(
+            {
+                "opcode": Opcode.ST,
+                "operand": {"type": Addressing.RELATIVE, "register": Register.STACK_POINTER, "offset": +1},
             }
-        })
+        )
         return address
 
     def write_stack_load(self, debug=None):
-        return self.write_instruction({
-            "opcode": Opcode.LD,
-            "operand": {
-                "type": Addressing.RELATIVE,
-                "register": Register.STACK_POINTER,
-                "offset": +1
-            }
-        }, debug)
+        return self.write_instruction(
+            {
+                "opcode": Opcode.LD,
+                "operand": {"type": Addressing.RELATIVE, "register": Register.STACK_POINTER, "offset": +1},
+            },
+            debug,
+        )
 
     def write_nop(self, debug=None):
         return self.write_instruction({"opcode": Opcode.NOP}, debug)
@@ -275,32 +268,25 @@ class Compiler:
 
     def _compile_variable_value_expression(self, expression: VariableValueExpression, variables: dict[str, dict]):
         variable_address = variables[expression.name]
-        self.text.write_instruction({
-            "opcode": Opcode.LD,
-            "operand": variable_address
-        }, debug="variable value [{}]".format(expression.name))
+        self.text.write_instruction(
+            {"opcode": Opcode.LD, "operand": variable_address}, debug="variable value [{}]".format(expression.name)
+        )
         self.text.write_accumulator_push()
 
     def _compile_number_literal(self, expression: NumberLiteralExpression):
         static_address = self.data.put_word(expression.value)
-        self.text.write_instruction({
-            "opcode": Opcode.LD,
-            "operand": {
-                "type": Addressing.ABSOLUTE,
-                "address": static_address
-            }
-        }, debug="number literal [{}]".format(expression.value))
+        self.text.write_instruction(
+            {"opcode": Opcode.LD, "operand": {"type": Addressing.ABSOLUTE, "address": static_address}},
+            debug="number literal [{}]".format(expression.value),
+        )
         self.text.write_accumulator_push()
 
     def _compile_string_literal(self, expression: StringLiteralExpression):
         static_address = self.data.put_string(expression.value)
-        self.text.write_instruction({
-            "opcode": Opcode.LD,
-            "operand": {
-                "type": Addressing.ABSOLUTE,
-                "address": static_address
-            }
-        }, debug="string literal [{}]".format(expression.value))
+        self.text.write_instruction(
+            {"opcode": Opcode.LD, "operand": {"type": Addressing.ABSOLUTE, "address": static_address}},
+            debug="string literal [{}]".format(expression.value),
+        )
         self.text.write_accumulator_push()
 
     def _compile_variable_assignment(self, expression: VariableAssignmentExpression, variables: dict[str, dict]):
@@ -308,31 +294,23 @@ class Compiler:
         self._compile_expression(expression.value, variables)
         self.text.write_stack_load()
         variable_address = variables[expression.name]
-        self.text.write_instruction({
-            "opcode": Opcode.ST,
-            "operand": variable_address
-        })
+        self.text.write_instruction({"opcode": Opcode.ST, "operand": variable_address})
 
     def _compile_allocation(self, expression: AllocationExpression):
         buffer_address = self.data.allocate(expression.size)
         static_address = self.data.put_word(buffer_address)
         self.text.write_push(debug="allocation of size [{}]".format(expression.size))
-        self.text.write_instruction({
-            "opcode": Opcode.LD,
-            "operand": {
-                "type": Addressing.ABSOLUTE,
-                "address": static_address
-            }
-        })
+        self.text.write_instruction(
+            {"opcode": Opcode.LD, "operand": {"type": Addressing.ABSOLUTE, "address": static_address}}
+        )
 
     def _compile_function_call(self, expression: FunctionCallExpression, variables: dict[str, dict]):
         for argument in expression.arguments:
             self._compile_expression(argument, variables)
-        self.text.write_instruction({
-            "opcode": Opcode.CALL,
-            "operand": None,
-            "symbol": expression.name
-        }, debug="function call [{}]".format(expression.name))
+        self.text.write_instruction(
+            {"opcode": Opcode.CALL, "operand": None, "symbol": expression.name},
+            debug="function call [{}]".format(expression.name),
+        )
         for i in range(len(expression.arguments)):
             self.text.write_pop(debug="local allocation clear")
         self.text.write_accumulator_push()
@@ -351,114 +329,97 @@ class Compiler:
         self._compile_expression(expression.first, variables)
         self._compile_expression(expression.second, variables)
         arithmetic_opcode = arithmetic_operators()[expression.operator]
-        self.text.write_instruction({
-            "opcode": Opcode.LD,
-            "operand": {
-                "type": Addressing.RELATIVE,
-                "register": Register.STACK_POINTER,
-                "offset": +2
+        self.text.write_instruction(
+            {
+                "opcode": Opcode.LD,
+                "operand": {"type": Addressing.RELATIVE, "register": Register.STACK_POINTER, "offset": +2},
+            },
+            debug="binary operation [{}]".format(expression.operator),
+        )
+        self.text.write_instruction(
+            {
+                "opcode": arithmetic_opcode,
+                "operand": {"type": Addressing.RELATIVE, "register": Register.STACK_POINTER, "offset": +1},
             }
-        }, debug="binary operation [{}]".format(expression.operator))
-        self.text.write_instruction({
-            "opcode": arithmetic_opcode,
-            "operand": {
-                "type": Addressing.RELATIVE,
-                "register": Register.STACK_POINTER,
-                "offset": +1
-            }
-        })
+        )
         self.text.write_pop()
-        self.text.write_instruction({
-            "opcode": Opcode.ST,
-            "operand": {
-                "type": Addressing.RELATIVE,
-                "register": Register.STACK_POINTER,
-                "offset": +1
+        self.text.write_instruction(
+            {
+                "opcode": Opcode.ST,
+                "operand": {"type": Addressing.RELATIVE, "register": Register.STACK_POINTER, "offset": +1},
             }
-        })
+        )
 
     def _compile_comparison_operator(self, expression: BinaryOperationExpression, variables: dict[str, dict]):
         assert expression.operator in comparison_operators()
         self._compile_expression(expression.first, variables)
         self._compile_expression(expression.second, variables)
         comparison_opcode = comparison_operators()[expression.operator]
-        self.text.write_instruction({
-            "opcode": Opcode.LD,
-            "operand": {
-                "type": Addressing.RELATIVE,
-                "register": Register.STACK_POINTER,
-                "offset": +2
+        self.text.write_instruction(
+            {
+                "opcode": Opcode.LD,
+                "operand": {"type": Addressing.RELATIVE, "register": Register.STACK_POINTER, "offset": +2},
+            },
+            debug="binary operation [{}]".format(expression.operator),
+        )
+        self.text.write_instruction(
+            {
+                "opcode": Opcode.SUB,
+                "operand": {"type": Addressing.RELATIVE, "register": Register.STACK_POINTER, "offset": +1},
             }
-        }, debug="binary operation [{}]".format(expression.operator))
-        self.text.write_instruction({
-            "opcode": Opcode.SUB,
-            "operand": {
-                "type": Addressing.RELATIVE,
-                "register": Register.STACK_POINTER,
-                "offset": +1
-            }
-        })
+        )
         self.text.write_instruction({"opcode": comparison_opcode})
         self.text.write_pop()
-        self.text.write_instruction({
-            "opcode": Opcode.ST,
-            "operand": {
-                "type": Addressing.RELATIVE,
-                "register": Register.STACK_POINTER,
-                "offset": +1
+        self.text.write_instruction(
+            {
+                "opcode": Opcode.ST,
+                "operand": {"type": Addressing.RELATIVE, "register": Register.STACK_POINTER, "offset": +1},
             }
-        })
+        )
 
     def _compile_store_operator(self, expression: BinaryOperationExpression, variables: dict[str, dict]):
         assert expression.operator == TokenType.KEY_STORE
         self._compile_expression(expression.first, variables)
         self._compile_expression(expression.second, variables)
-        self.text.write_instruction({
-            "opcode": Opcode.LD,
-            "operand": {
-                "type": Addressing.RELATIVE,
-                "register": Register.STACK_POINTER,
-                "offset": +1
+        self.text.write_instruction(
+            {
+                "opcode": Opcode.LD,
+                "operand": {"type": Addressing.RELATIVE, "register": Register.STACK_POINTER, "offset": +1},
+            },
+            debug="binary operation [{}]".format(expression.operator),
+        )
+        self.text.write_instruction(
+            {
+                "opcode": Opcode.ST,
+                "operand": {"type": Addressing.RELATIVE_INDIRECT, "register": Register.STACK_POINTER, "offset": +2},
             }
-        }, debug="binary operation [{}]".format(expression.operator))
-        self.text.write_instruction({
-            "opcode": Opcode.ST,
-            "operand": {
-                "type": Addressing.RELATIVE_INDIRECT,
-                "register": Register.STACK_POINTER,
-                "offset": +2
-            }
-        })
+        )
 
     def _compile_unary_operator(self, expression: UnaryOperatorExpression, variables: dict[str, dict]):
         self._compile_expression(expression.operand, variables)
         unary_opcode = unary_operators()[expression.operator]
         if unary_opcode == Opcode.LD:
-            self.text.write_instruction({
-                "opcode": unary_opcode,
-                "operand": {
-                    "type": Addressing.RELATIVE_INDIRECT,
-                    "register": Register.STACK_POINTER,
-                    "offset": +1
-                }
-            }, debug="unary operation [{}]".format(expression.operator))
+            self.text.write_instruction(
+                {
+                    "opcode": unary_opcode,
+                    "operand": {"type": Addressing.RELATIVE_INDIRECT, "register": Register.STACK_POINTER, "offset": +1},
+                },
+                debug="unary operation [{}]".format(expression.operator),
+            )
         else:
-            self.text.write_instruction({
-                "opcode": unary_opcode,
-                "operand": {
-                    "type": Addressing.RELATIVE,
-                    "register": Register.STACK_POINTER,
-                    "offset": +1
-                }
-            }, debug="unary operation [{}]".format(expression.operator))
-        self.text.write_instruction({
-            "opcode": Opcode.ST,
-            "operand": {
-                "type": Addressing.RELATIVE,
-                "register": Register.STACK_POINTER,
-                "offset": +1
+            self.text.write_instruction(
+                {
+                    "opcode": unary_opcode,
+                    "operand": {"type": Addressing.RELATIVE, "register": Register.STACK_POINTER, "offset": +1},
+                },
+                debug="unary operation [{}]".format(expression.operator),
+            )
+        self.text.write_instruction(
+            {
+                "opcode": Opcode.ST,
+                "operand": {"type": Addressing.RELATIVE, "register": Register.STACK_POINTER, "offset": +1},
             }
-        })
+        )
 
     def _compile_nullary_operator(self, expression: NullaryOperatorExpression):
         if expression.operator == TokenType.KEY_GET:
@@ -490,14 +451,13 @@ class Compiler:
         self.text.write_instruction(true_jump_out)
         false_address = self.text.write_nop(debug="if false")
         self._compile_expression(expression.false_expression, variables)
-        after_address = self.text.write_instruction({
-            "opcode": Opcode.LD,
-            "operand": {
-                "type": Addressing.RELATIVE,
-                "offset": +2,
-                "register": Register.STACK_POINTER
-            }
-        }, debug="after if")
+        after_address = self.text.write_instruction(
+            {
+                "opcode": Opcode.LD,
+                "operand": {"type": Addressing.RELATIVE, "offset": +2, "register": Register.STACK_POINTER},
+            },
+            debug="after if",
+        )
         self.text.write_pop()
         true_jump_out["operand"] = after_address
         false_jump["operand"] = false_address

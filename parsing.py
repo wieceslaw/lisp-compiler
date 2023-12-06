@@ -89,19 +89,16 @@ class VariableValueExpression(Expression):
 
 
 class ConditionExpression(Expression):
-    def __init__(self,
-                 token: Token,
-                 condition: Expression,
-                 true_expression: Expression,
-                 false_expression: Expression) -> None:
+    def __init__(
+        self, token: Token, condition: Expression, true_expression: Expression, false_expression: Expression
+    ) -> None:
         super().__init__(token)
         self.condition = condition
         self.true_expression = true_expression
         self.false_expression = false_expression
 
     def __repr__(self) -> str:
-        return ("CONDITION [{}, TRUE: {}, FALSE: {}]"
-                .format(self.condition, self.true_expression, self.false_expression))
+        return "CONDITION [{}, TRUE: {}, FALSE: {}]".format(self.condition, self.true_expression, self.false_expression)
 
     def children(self) -> list[Expression]:
         return [self.condition, self.true_expression, self.false_expression]
@@ -137,8 +134,7 @@ class FunctionDefinitionExpression(Expression):
         self.body = body
 
     def __repr__(self) -> str:
-        return ('FUNCTION DEF [NAME: "{}", PARAMETERS: {}, BODY: {}]'
-                .format(self.name, self.parameters, self.body))
+        return 'FUNCTION DEF [NAME: "{}", PARAMETERS: {}, BODY: {}]'.format(self.name, self.parameters, self.body)
 
     def children(self) -> list[Expression]:
         return self.body

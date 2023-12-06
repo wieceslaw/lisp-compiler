@@ -46,7 +46,7 @@ def main(source_file: str, target_file: str):
             "source LoC:",
             len(source_file.split("\n")),
             "code instr: {}".format(len(instruction_code)),
-            "static memory: {}".format(len(static_memory))
+            "static memory: {}".format(len(static_memory)),
         )
 
 
