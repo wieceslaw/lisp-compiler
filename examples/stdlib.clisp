@@ -1,5 +1,5 @@
 ; вспомогательная функция для объединения выражений
-(defun .(x, y))
+(defun .(x, y) y)
 
 ; инвертировать число
 (defun neg(n)
@@ -9,6 +9,22 @@
 ; логическое нет
 (defun is-not(b)
     (if (= b 0) 1 0)
+)
+
+; остаток от деления n на d
+(defun mod(n d)
+    (setq negative (< n 0))
+    (if negative
+        (setq n (neg n))
+        0                       ; skip "else" branch
+    )                           ; temporary change sign
+    (setq r n)
+    (setq q 0)
+    (loop (or (> r d) (= r d))
+        (setq r (- r d))
+        (setq q (+ 1 q))
+    )
+    (if negative (neg r) r)     ; return sign
 )
 
 ; целочисленное деление n на d

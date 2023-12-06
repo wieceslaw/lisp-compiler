@@ -16,7 +16,6 @@ class TokenType(str, Enum):
     LESS = "T_LESS"  # <
     GREATER = "T_GREATER"  # >
 
-    MOD = "T_MOD"  # mod
     AND = "T_AND"  # and
     OR = "T_OR"  # or
     NOT = "T_NOT"  # not
@@ -44,7 +43,6 @@ tokens_patterns = [
     (r"=", TokenType.EQUALS),
     (r"<", TokenType.LESS),
     (r">", TokenType.GREATER),
-    (r"mod", TokenType.MOD),
     (r"and", TokenType.AND),
     (r"or", TokenType.OR),
     (r"not", TokenType.NOT),
@@ -68,7 +66,6 @@ tokens_patterns = [(re.compile(pattern), ttype) for pattern, ttype in tokens_pat
 
 def binary_operators():
     return {
-        TokenType.MOD,
         TokenType.AND,
         TokenType.OR,
         TokenType.PLUS,

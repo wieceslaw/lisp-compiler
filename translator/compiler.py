@@ -20,7 +20,6 @@ def comparison_operators() -> dict[TokenType, Opcode]:
 
 def arithmetic_operators() -> dict[TokenType, Opcode]:
     return {
-        TokenType.MOD: Opcode.MOD,
         TokenType.AND: Opcode.AND,
         TokenType.OR: Opcode.OR,
         TokenType.PLUS: Opcode.ADD,
