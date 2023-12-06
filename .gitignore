@@ -1,5 +1,6 @@
 **/__pycache__/
 .idea
-test
+.ruff_cache
+.venv
 output
 test.py

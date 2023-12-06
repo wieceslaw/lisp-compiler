@@ -12,3 +12,4 @@ class DataPath:
         for i, word in enumerate(data_segment):
             self.memory[i] = word
         self.input_buffer = input_buffer
+

@@ -1,12 +1,14 @@
+from __future__ import annotations
+
 import json
 import sys
 
-from machine.isa import Opcode
 from compiler import Compiler
+from isa import Opcode
 from lexer import Lexer
 from parsing import Parser
 
-STDLIB_FILE = "../examples/stdlib.clisp"
+STDLIB_FILE = "examples/stdlib.clisp"
 
 
 def write_code(filename: str, instruction_code: list[dict], static_data: list[int]):
@@ -29,13 +31,13 @@ def translate(source_code: str) -> tuple[list[dict], list[int]]:
     tokens = lex.tokenize()
     ast = Parser(tokens).parse()
     compiler = Compiler(ast, 1024, 1024)
-    compiler.compile()
+    compiler.process()
     return compiler.text.instructions, compiler.data.layout()
 
 
 def main(source_file: str, target_file: str):
     with open(STDLIB_FILE, encoding="utf-8") as file:
-        stdlib_source = file.read() + '\n'
+        stdlib_source = file.read() + "\n"
     with open(source_file, encoding="utf-8") as file:
         source_file = file.read() + stdlib_source
         instruction_code, static_memory = translate(source_file)

@@ -465,10 +465,10 @@ iszero:
 
 Состоит из 4 основных файлов:
 
-- [lexer.py](translator/lexer.py)
-- [parsing.py](translator/parsing.py)
-- [compiler.py](translator/compiler.py)
-- [translator.py](translator/translator.py)
+- [lexer.py](lexer.py)
+- [parsing.py](parsing.py)
+- [compiler.py](compiler.py)
+- [translator.py](translator.py)
 
 ### Лексер
 
@@ -486,7 +486,7 @@ iszero:
 ### Компилятор
 
 Получает на вход абстрактное синтаксическое дерево от парсера, на основе которого формирует
-линейный код в виде списка инструкций, описанных в [isa.py](machine/isa.py).
+линейный код в виде списка инструкций, описанных в [isa.py](isa.py).
 
 Внутри файла находится 3 основных класса:
 

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import re
 from enum import Enum
 
@@ -128,13 +130,13 @@ class Lexer:
     def tokenize(self) -> list[Token]:
         tokens = []
         while True:
-            token = self.next()
+            token = self._next()
             if token is None:
                 break
             tokens.append(token)
         return tokens
 
-    def next(self) -> Token:
+    def _next(self) -> Token | None:
         if self._skip_empty():
             return None
         char = self.text[self.ptr]
@@ -143,12 +145,11 @@ class Lexer:
             self.ptr += 1
             self.offset += 1
             return Token(char, self.line, current_offset)
-        elif char == '"':
+        if char == '"':
             return Token(self._read_string_literal(), self.line, current_offset)
-        elif char == "'":
+        if char == "'":
             return Token(self._read_character_literal(), self.line, current_offset)
-        else:
-            return Token(self._read_string(), self.line, current_offset)
+        return Token(self._read_string(), self.line, current_offset)
 
     def _read_string(self) -> str:
         result = ""
