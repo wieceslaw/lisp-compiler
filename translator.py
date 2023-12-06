@@ -27,10 +27,6 @@ def read_code(filename: str) -> tuple[list[dict], list[int]]:
         # TODO: deserialize Addressing and Register
         for instruction in code:
             instruction["opcode"] = Opcode(instruction["opcode"])
-            if "operand" in instruction:
-                operand = instruction["operand"]
-
-
     return code["code"], code["data"]
 
 
