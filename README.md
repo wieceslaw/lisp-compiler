@@ -246,24 +246,23 @@ ABSOLUTE ADDRESS:
     MEM[AR]     -> DR
 
 RELATIVE ADDRESS:
-    CR[8:31]    -> BR
-    BR + $reg   -> AR
-    MEM[AR]     -> DR
-    
+    CR[8:31] + $reg   -> AR
+    MEM[AR]           -> DR
+    DR                -> AR
+
 RELATIVE INDIRECT ADDRESS:
-    CR[8:31]    -> BR
-    BR + $reg   -> AR
-    MEM[AR]     -> DR
-    DR          -> AR
-    MEM[AR]     -> DR
+    CR[8:31] + $reg   -> AR
+    MEM[AR]           -> DR
+    DR                -> AR
+    MEM[AR]           -> DR
 
 EXECUTION FLOW ADDRESS:
     CR[8:31]    -> DR
 
 
 Execution:
-add, sub, mod, and, or:
-    AC + DR -> AC
+add, sub, and, or:
+    AC . DR -> AC
 
 not:
     NOT(AC) -> AC
@@ -460,7 +459,6 @@ iszero:
   111
 ]
 ```
-![img.png](images/img.png)
 
 ## Транслятор
 
@@ -508,3 +506,12 @@ iszero:
 - соединяет исходный код со стандартной библиотекой
 - использует перечисленные файлы для преобразования исходного кода
 - обеспечивает работу с командной строкой
+
+
+## Модель процессора
+
+### Data Path
+![img.png](images/img.png)
+
+### Control Unit
+![img1.png](images/img1.png)

@@ -4,7 +4,6 @@ from enum import Enum
 class Opcode(str, Enum):
     ADD = "add"
     SUB = "sub"
-    MOD = "mod"
     AND = "and"
     OR = "or"
     NOT = "not"
@@ -32,6 +31,7 @@ class Addressing(str, Enum):
     ABSOLUTE = "absolute"
     RELATIVE = "relative"
     RELATIVE_INDIRECT = "relative-indirect"
+    CONTROL_FLOW = "control-flow"
 
     def __repr__(self):
         return self.name

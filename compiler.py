@@ -212,7 +212,7 @@ class Compiler:
             if instruction["opcode"] == Opcode.CALL:
                 symbol = instruction["symbol"]
                 instruction.pop("symbol")
-                instruction["operand"] = self.symbol_table[symbol]
+                instruction["operand"] = {"type": Addressing.CONTROL_FLOW, "address": self.symbol_table[symbol]}
 
     def _compile_root(self, root: RootExpression, variables: dict):
         self.text.write_nop(debug="program start")
@@ -269,7 +269,8 @@ class Compiler:
     def _compile_variable_value_expression(self, expression: VariableValueExpression, variables: dict[str, dict]):
         variable_address = variables[expression.name]
         self.text.write_instruction(
-            {"opcode": Opcode.LD, "operand": variable_address}, debug="variable value [{}]".format(expression.name)
+            {"opcode": Opcode.LD, "operand": {"type": Addressing.CONTROL_FLOW, "address": variable_address}},
+            debug="variable value [{}]".format(expression.name),
         )
         self.text.write_accumulator_push()
 
@@ -294,7 +295,9 @@ class Compiler:
         self._compile_expression(expression.value, variables)
         self.text.write_stack_load()
         variable_address = variables[expression.name]
-        self.text.write_instruction({"opcode": Opcode.ST, "operand": variable_address})
+        self.text.write_instruction(
+            {"opcode": Opcode.ST, "operand": {"type": Addressing.CONTROL_FLOW, "address": variable_address}}
+        )
 
     def _compile_allocation(self, expression: AllocationExpression):
         buffer_address = self.data.allocate(expression.size)
@@ -437,9 +440,12 @@ class Compiler:
         for body_expression in expression.body:
             self._compile_expression(body_expression, variables)
             self.text.write_pop()
-        self.text.write_instruction({"opcode": Opcode.JMP, "operand": loop_start_address}, debug="jump loop begin")
+        self.text.write_instruction(
+            {"opcode": Opcode.JMP, "operand": {"type": Addressing.CONTROL_FLOW, "address": loop_start_address}},
+            debug="jump loop begin",
+        )
         loop_after_address = self.text.write_nop(debug="loop after")
-        loop_after_instruction["operand"] = loop_after_address
+        loop_after_instruction["operand"] = {"type": Addressing.CONTROL_FLOW, "address": loop_after_address}
 
     def _compile_condition(self, expression: ConditionExpression, variables: dict[str, dict]):
         self._compile_expression(expression.condition, variables)
@@ -459,5 +465,5 @@ class Compiler:
             debug="after if",
         )
         self.text.write_pop()
-        true_jump_out["operand"] = after_address
-        false_jump["operand"] = false_address
+        true_jump_out["operand"] = {"type": Addressing.CONTROL_FLOW, "address": after_address}
+        false_jump["operand"] = {"type": Addressing.CONTROL_FLOW, "address": false_address}
