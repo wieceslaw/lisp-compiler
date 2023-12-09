@@ -4,7 +4,7 @@ import json
 import sys
 
 from compiler import Compiler
-from isa import Opcode, Addressing, Register
+from isa import Addressing, Opcode, Register
 from lexer import Lexer
 from parsing import Parser
 

@@ -5,10 +5,12 @@
 (setq sum 0)
 (setq i 1)
 (loop (< i 1000)
-    (setq i (+ 1 i))
-    (if (or (= 0 (mod i 5)) (= 0 (mod i 3)))
+    (setq i (+ i 1))
+    (if (= 0 (mod i 3))
         (setq sum (+ sum i))
-        0
+        (if (= 0 (mod i 5))
+            (setq sum (+ sum i)) 0
+        )
     )
 )
 (print-num sum)

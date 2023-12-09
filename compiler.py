@@ -6,6 +6,7 @@ from parsing import (
     AllocationExpression,
     BinaryOperationExpression,
     ConditionExpression,
+    EmptyExpression,
     Expression,
     FunctionCallExpression,
     FunctionDefinitionExpression,
@@ -17,7 +18,6 @@ from parsing import (
     UnaryOperatorExpression,
     VariableAssignmentExpression,
     VariableValueExpression,
-    EmptyExpression,
 )
 
 
@@ -206,8 +206,7 @@ class Compiler:
         for name in Compiler._function_calls(root):
             if not visited[name]:
                 dfs(functions[name])
-        functions = {name: func for name, func in functions.items() if visited[name]}
-        return functions
+        return {name: func for name, func in functions.items() if visited[name]}
 
     def _collect_variables(self, expression: Expression, context: dict[str, int]) -> dict[str, int]:
         def _traverser(e: Expression):
