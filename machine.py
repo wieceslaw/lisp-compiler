@@ -14,7 +14,7 @@ INT8_MAX = 2**7 - 1
 INT8_MIN = -(2**7)
 OPERAND_MAX = 2**23 - 1
 OPERAND_MIN = -(2**23)
-HALF_N = 2 ** 32
+HALF_N = 2**32
 N = HALF_N * 2
 
 
