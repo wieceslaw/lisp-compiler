@@ -23,6 +23,22 @@ class Opcode(str, Enum):
     NOP = "nop"
     HALT = "halt"
 
+    def is_address(self):
+        return self in {
+            Opcode.ADD,
+            Opcode.SUB,
+            Opcode.AND,
+            Opcode.OR,
+            Opcode.LD,
+            Opcode.ST,
+            Opcode.JMP,
+            Opcode.JZ,
+            Opcode.CALL,
+        }
+
+    def is_operand(self):
+        return self in {Opcode.ADD, Opcode.SUB, Opcode.AND, Opcode.OR, Opcode.LD}
+
     def __repr__(self):
         return self.name
 

@@ -211,6 +211,11 @@ class AllocationExpression(Expression):
         return "MEMORY ALLOCATION [SIZE: {}]".format(self.size)
 
 
+class EmptyExpression(Expression):
+    def __init__(self, token: Token) -> None:
+        super().__init__(token)
+
+
 class Parser:
     def __init__(self, tokens):
         self._tokens = tokens

@@ -8,12 +8,18 @@ from isa import Addressing, Opcode, Register
 from translator import read_code
 
 MAX_MEMORY_SIZE = 2**24
-INT32_MAX = 2**32 - 1
-INT32_MIN = -(2**32)
-INT8_MAX = 2**8 - 1
-INT8_MIN = -(2**8)
-OPERAND_MAX = 2**24 - 1
-OPERAND_MIN = 0
+INT32_MAX = 2**31 - 1
+INT32_MIN = -(2**31)
+INT8_MAX = 2**7 - 1
+INT8_MIN = -(2**7)
+OPERAND_MAX = 2**23 - 1
+OPERAND_MIN = -(2**23)
+HALF_N = 2 ** 32
+N = HALF_N * 2
+
+
+def overflow(value):
+    return (value + HALF_N) % N - HALF_N
 
 
 def is_valid_word(word: int) -> bool:
@@ -24,20 +30,20 @@ def is_valid_byte(byte: int) -> bool:
     return INT8_MAX >= byte >= INT8_MIN
 
 
-def is_valid_operand(operand: int) -> bool:
-    return OPERAND_MAX >= operand >= OPERAND_MIN
+def is_valid_address_word(word: int) -> bool:
+    return OPERAND_MAX >= word >= OPERAND_MIN
 
 
-def extract_operand_value(operand: dict):
-    match operand["type"]:
+def extract_address_value(address: dict):
+    match address["type"]:
         case Addressing.RELATIVE:
-            return operand["offset"]
+            return address["offset"]
         case Addressing.RELATIVE_INDIRECT:
-            return operand["offset"]
+            return address["offset"]
         case Addressing.ABSOLUTE:
-            return operand["address"]
+            return address["value"]
         case Addressing.CONTROL_FLOW:
-            return operand["address"]
+            return address["value"]
         case _:
             assert False, "Unknown address type"
 
@@ -120,11 +126,15 @@ class DataPath:
         self._instruction_operand = 0
 
     def _port_read(self) -> int:
-        return self._input_buffer.pop(0)
+        if len(self._input_buffer) == 0:
+            return 0  # EOF
+        byte = self._input_buffer.pop(0)
+        assert is_valid_byte(byte), "Out of byte bounds"
+        return byte
 
-    def _port_write(self, word: int):
-        assert is_valid_byte(word), "Out of byte bounds"
-        self._output_buffer.append(word)
+    def _port_write(self, byte: int):
+        assert is_valid_byte(byte), "Out of byte bounds"
+        self._output_buffer.append(byte)
 
     def _clear_alu(self):
         self._alu_in_left_selector = 0
@@ -156,6 +166,7 @@ class DataPath:
                 assert False, "Unknown alu operand"
 
     def _alu_out(self, word: int):
+        word = overflow(word)
         match self._alu_out_selector:
             case AluOutSelector.REG_IP:
                 self._instruction_pointer = word
@@ -212,9 +223,9 @@ class DataPath:
     def set_alu_out_selector(self, selector: AluOutSelector):
         self._alu_out_selector = selector
 
-    def set_instruction_operand(self, operand: int):
-        # assert is_valid_operand(operand), "Operand value out of bounds"
-        self._instruction_operand = operand
+    def set_instruction_address_word(self, word: int):
+        assert is_valid_address_word(word), "Value out of bounds"
+        self._instruction_operand = word
 
     def alu_signals(
         self,
@@ -282,10 +293,10 @@ class ControlUnit:
     def _latch_command_register(self):
         self._command_register = self._instruction_memory[self._instruction_address()]
 
-    def _set_instruction_operand(self):
-        assert "operand" in self._command_register, "Is not an address command [{}]".format(self._command_register)
-        operand = self._command_register["operand"]
-        self._data_path.set_instruction_operand(extract_operand_value(operand))
+    def _set_instruction_value(self):
+        assert self._current_instruction()["opcode"].is_address()
+        address = self._current_instruction()["address"]
+        self._data_path.set_instruction_address_word(extract_address_value(address))
 
     def tick(self):
         self._tick += 1
@@ -299,10 +310,18 @@ class ControlUnit:
             instruction_fetch_tick = self._instruction_fetch(instruction_fetch_tick)
             self.tick()
 
-        operand_fetch_tick = 0
-        while operand_fetch_tick != -1:
-            operand_fetch_tick = self._operand_fetch(operand_fetch_tick)
-            self.tick()
+        opcode = self._current_instruction()["opcode"]
+        if opcode.is_address():
+            address_fetch_tick = 0
+            while address_fetch_tick != -1:
+                address_fetch_tick = self._address_fetch(address_fetch_tick)
+                self.tick()
+
+        if opcode.is_operand():
+            operand_fetch_tick = 0
+            while operand_fetch_tick != -1:
+                operand_fetch_tick = self._operand_fetch(operand_fetch_tick)
+                self.tick()
 
         execution_tick = 0
         while execution_tick != -1:
@@ -321,25 +340,18 @@ class ControlUnit:
             case _:
                 assert False, "Unexpected tick {}".format(tick)
 
-    def _operand_fetch(self, tick: int) -> int:
-        operand = self._current_instruction().get("operand")
-        if operand is None:
-            return -1
-        self._set_instruction_operand()
-        operand_type = operand["type"]
+    def _address_fetch(self, tick: int) -> int:
+        self._set_instruction_value()
+        address = self._current_instruction()["address"]
+        operand_type = address["type"]
         match operand_type:
             case Addressing.ABSOLUTE:
                 match tick:
                     case 0:
                         self._move(AluInSelector.INS_OP, AluOutSelector.REG_AR)
-                        return tick + 1
-                    case 1:
-                        self._data_path.set_data_select(DataSelector.DATA_MEMORY)
-                        self._data_path.read_signal()
                         return -1
                     case _:
                         assert False, "Unexpected tick {}".format(tick)
-
             case Addressing.CONTROL_FLOW:
                 match tick:
                     case 0:
@@ -347,28 +359,22 @@ class ControlUnit:
                         return -1
                     case _:
                         assert False, "Unexpected tick {}".format(tick)
-
             case Addressing.RELATIVE:
                 match tick:
                     case 0:
-                        register = operand["register"]
+                        register = address["register"]
                         selector = register_selector(register)
                         self._data_path.set_left_alu_in_selector(AluInSelector.INS_OP)
                         self._data_path.set_right_alu_in_selector(selector)
                         self._data_path.set_alu_out_selector(AluOutSelector.REG_AR)
                         self._data_path.alu_signals(AluOperationSignal.ADD)
-                        return tick + 1
-                    case 1:
-                        self._data_path.set_data_select(DataSelector.DATA_MEMORY)
-                        self._data_path.read_signal()
                         return -1
                     case _:
                         assert False, "Unexpected tick {}".format(tick)
-
             case Addressing.RELATIVE_INDIRECT:
                 match tick:
                     case 0:
-                        register = operand["register"]
+                        register = address["register"]
                         selector = register_selector(register)
                         self._data_path.set_left_alu_in_selector(AluInSelector.INS_OP)
                         self._data_path.set_right_alu_in_selector(selector)
@@ -381,16 +387,21 @@ class ControlUnit:
                         return tick + 1
                     case 2:
                         self._move(AluInSelector.REG_DR, AluOutSelector.REG_AR)
-                        return tick + 1
-                    case 3:
-                        self._data_path.set_data_select(DataSelector.DATA_MEMORY)
-                        self._data_path.read_signal()
                         return -1
                     case _:
                         assert False, "Unexpected tick {}".format(tick)
 
             case _:
                 assert False, "Unknown operand type {}".format(operand_type)
+
+    def _operand_fetch(self, tick: int) -> int:
+        match tick:
+            case 0:
+                self._data_path.set_data_select(DataSelector.DATA_MEMORY)
+                self._data_path.read_signal()
+                return -1
+            case _:
+                assert False, "Unexpected tick {}".format(tick)
 
     def _execute(self, tick: int) -> int:
         opcode = self._current_instruction()["opcode"]
@@ -662,7 +673,7 @@ def simulation(
     input_tokens: list[int],
     limit: int,
 ):
-    data_path = DataPath(data_memory_size, data_segment, [*input_tokens, 0])
+    data_path = DataPath(data_memory_size, data_segment, input_tokens)
     control_unit = ControlUnit(instruction_memory_size, text_segment, data_path)
     instr_counter = 0
 

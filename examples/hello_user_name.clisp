@@ -3,8 +3,8 @@
 
 (setq buffer-size 512)
 (setq buffer (alloc 512))
-(print "> What is your name?\n")
-(print "> ")
+(print "> What is your name?")
+(put 10)
 (read buffer buffer-size)
 (print "> Hello, ")
 (print buffer)
