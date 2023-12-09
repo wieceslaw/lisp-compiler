@@ -248,7 +248,6 @@ ABSOLUTE ADDRESS:
 RELATIVE ADDRESS:
     CR[8:31] + $reg   -> AR
     MEM[AR]           -> DR
-    DR                -> AR
 
 RELATIVE INDIRECT ADDRESS:
     CR[8:31] + $reg   -> AR
@@ -295,14 +294,11 @@ ret:
     SP      -> AR
     MEM[AR] -> DR
     DR      -> IP
-    
+
 ld:
-    DR      -> AR
-    MEM[AR] -> DR
     DR      -> AC
-    
+
 st:
-    DR      -> AR
     AC      -> DR
     DR      -> MEM[AR]
  

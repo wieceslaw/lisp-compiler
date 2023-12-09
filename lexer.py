@@ -59,7 +59,7 @@ tokens_patterns = [
     (r"if", TokenType.KEY_IF),
     (r"'.'", TokenType.CHARACTER_LITERAL),
     (r'"(.*)"', TokenType.STRING_LITERAL),
-    (r"[0-9]+", TokenType.NUMBER_LITERAL),
+    (r"[+-]?[0-9]+", TokenType.NUMBER_LITERAL),
     (r"[a-zA-Z\.]\w*", TokenType.VARNAME),
 ]
 assert len(tokens_patterns) == len([i for i in TokenType])  # assert that all cases are matched

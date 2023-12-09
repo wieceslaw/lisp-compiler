@@ -4,7 +4,7 @@ import json
 import sys
 
 from compiler import Compiler
-from isa import Opcode
+from isa import Opcode, Addressing, Register
 from lexer import Lexer
 from parsing import Parser
 
@@ -23,18 +23,24 @@ def write_code(filename: str, instruction_code: list[dict], static_data: list[in
 
 def read_code(filename: str) -> tuple[list[dict], list[int]]:
     with open(filename, encoding="utf-8") as file:
-        code = json.loads(file.read())
-        # TODO: deserialize Addressing and Register
+        content = json.loads(file.read())
+        code = content["code"]
+        data = content["data"]
         for instruction in code:
             instruction["opcode"] = Opcode(instruction["opcode"])
-    return code["code"], code["data"]
+            if "operand" in instruction:
+                operand = instruction["operand"]
+                operand["type"] = Addressing(operand["type"])
+                if "register" in operand:
+                    operand["register"] = Register(operand["register"])
+    return code, data
 
 
 def translate(source_code: str) -> tuple[list[dict], list[int]]:
     lex = Lexer(source_code)
     tokens = lex.tokenize()
     ast = Parser(tokens).parse()
-    compiler = Compiler(ast, 1024, 1024)
+    compiler = Compiler(ast, 1024, 2048)
     compiler.process()
     return compiler.text.instructions, compiler.data.layout()
 

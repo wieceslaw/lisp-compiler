@@ -3,5 +3,8 @@
 .ruff_cache
 .pytest_cache
 .venv
+
 output
 test.py
+input.txt
+examples/program.clisp

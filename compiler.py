@@ -26,9 +26,9 @@ def unary_operators() -> dict[TokenType, Opcode]:
 
 def comparison_operators() -> dict[TokenType, Opcode]:
     return {
-        TokenType.EQUALS: Opcode.ISZERO,
-        TokenType.GREATER: Opcode.ISPOS,
-        TokenType.LESS: Opcode.ISNEG,
+        TokenType.EQUALS: Opcode.IS_ZERO,
+        TokenType.GREATER: Opcode.IS_POS,
+        TokenType.LESS: Opcode.IS_NEG,
     }
 
 
@@ -167,14 +167,14 @@ class Compiler:
         parameter_index = {function.parameters[i]: i for i in range(len(function.parameters))}
         for index, name in enumerate(parameter_index):
             variables[name] = {
-                "addressing": Addressing.RELATIVE,
+                "type": Addressing.RELATIVE,
                 "register": Register.FRAME_POINTER,
                 "offset": +2 - index + len(parameter_index),
             }
         locals_index = self._collect_variables(function, parameter_index)
         for index, name in enumerate(locals_index):
             variables[name] = {
-                "addressing": Addressing.RELATIVE,
+                "type": Addressing.RELATIVE,
                 "register": Register.FRAME_POINTER,
                 "offset": -index,
             }
@@ -192,14 +192,14 @@ class Compiler:
         root.apply_traverse(extractor)
         return functions
 
-    def _collect_variables(self, expression: Expression, context: dict[str, dict]) -> dict[str, int]:
+    def _collect_variables(self, expression: Expression, context: dict[str, int]) -> dict[str, int]:
         def _traverser(e: Expression):
             if isinstance(e, FunctionCallExpression):
                 assert e.name in self.functions, "Unknown function symbol [{}]".format(e.token)
             elif isinstance(e, VariableValueExpression):
                 assert e.name in variables or e.name in context, "Unknown variable symbol [{}]".format(e.token)
             elif isinstance(e, VariableAssignmentExpression):
-                if e.name not in variables:
+                if e.name not in variables and e.name not in context:
                     variables[e.name] = len(variables)
             return e
 
@@ -231,7 +231,7 @@ class Compiler:
             self.text.write_push(debug="garbage push")
         for i, e in enumerate(expression.body):
             self._compile_expression(e, variables)
-            if i != len(expression.body):
+            if i != len(expression.body) - 1:
                 self.text.write_pop()
         self.text.write_stack_load(debug="save result")
         self.text.write_pop("clear result")
@@ -269,7 +269,7 @@ class Compiler:
     def _compile_variable_value_expression(self, expression: VariableValueExpression, variables: dict[str, dict]):
         variable_address = variables[expression.name]
         self.text.write_instruction(
-            {"opcode": Opcode.LD, "operand": {"type": Addressing.CONTROL_FLOW, "address": variable_address}},
+            {"opcode": Opcode.LD, "operand": variable_address},
             debug="variable value [{}]".format(expression.name),
         )
         self.text.write_accumulator_push()
@@ -283,7 +283,8 @@ class Compiler:
         self.text.write_accumulator_push()
 
     def _compile_string_literal(self, expression: StringLiteralExpression):
-        static_address = self.data.put_string(expression.value)
+        string_address = self.data.put_string(expression.value)
+        static_address = self.data.put_word(string_address)
         self.text.write_instruction(
             {"opcode": Opcode.LD, "operand": {"type": Addressing.ABSOLUTE, "address": static_address}},
             debug="string literal [{}]".format(expression.value),
@@ -295,9 +296,7 @@ class Compiler:
         self._compile_expression(expression.value, variables)
         self.text.write_stack_load()
         variable_address = variables[expression.name]
-        self.text.write_instruction(
-            {"opcode": Opcode.ST, "operand": {"type": Addressing.CONTROL_FLOW, "address": variable_address}}
-        )
+        self.text.write_instruction({"opcode": Opcode.ST, "operand": variable_address})
 
     def _compile_allocation(self, expression: AllocationExpression):
         buffer_address = self.data.allocate(expression.size)
@@ -397,6 +396,7 @@ class Compiler:
                 "operand": {"type": Addressing.RELATIVE_INDIRECT, "register": Register.STACK_POINTER, "offset": +2},
             }
         )
+        self.text.write_pop()
 
     def _compile_unary_operator(self, expression: UnaryOperatorExpression, variables: dict[str, dict]):
         self._compile_expression(expression.operand, variables)
@@ -437,6 +437,7 @@ class Compiler:
         self.text.write_stack_load()
         loop_after_instruction = {"opcode": Opcode.JZ, "operand": None}
         self.text.write_instruction(loop_after_instruction, debug="jump out of loop")
+        self.text.write_pop(debug="clear compare")
         for body_expression in expression.body:
             self._compile_expression(body_expression, variables)
             self.text.write_pop()
@@ -459,7 +460,7 @@ class Compiler:
         self._compile_expression(expression.false_expression, variables)
         after_address = self.text.write_instruction(
             {
-                "opcode": Opcode.LD,
+                "opcode": Opcode.ST,
                 "operand": {"type": Addressing.RELATIVE, "offset": +2, "register": Register.STACK_POINTER},
             },
             debug="after if",

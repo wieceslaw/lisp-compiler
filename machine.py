@@ -52,12 +52,12 @@ def register_selector(register: Register):
             assert False, "Unknown register type"
 
 
-class DataSelector(Enum, int):
+class DataSelector(Enum):
     DATA_MEMORY = 0
     IO_PORT = 1
 
 
-class AluInSelector(Enum, int):
+class AluInSelector(Enum):
     ZERO = 0
     REG_AC = 1
     REG_FP = 2
@@ -69,7 +69,7 @@ class AluInSelector(Enum, int):
     INS_OP = 8
 
 
-class AluOutSelector(Enum, int):
+class AluOutSelector(Enum):
     REG_AC = 0
     REG_FP = 1
     REG_BR = 2
@@ -79,7 +79,7 @@ class AluOutSelector(Enum, int):
     REG_AR = 6
 
 
-class AluOperationSignal(Enum, int):
+class AluOperationSignal(Enum):
     ADD = 0
     AND = 1
     OR = 2
@@ -106,21 +106,21 @@ class DataPath:
         self._accumulator = 0
         self._frame_pointer = 0
         self._buffer_register = 0
-        self._stack_pointer = 0
+        self._stack_pointer = data_memory_size - 1
         self._instruction_pointer = 0
         self._data_register = 0
         self._address_register = 0
 
         # selectors
-        self._data_selector = 0
-        self._alu_in_left_selector = 0
-        self._alu_in_right_selector = 0
-        self._alu_out_selector = 0
+        self._data_selector = DataSelector.DATA_MEMORY
+        self._alu_in_left_selector = AluInSelector.ZERO
+        self._alu_in_right_selector = AluInSelector.ZERO
+        self._alu_out_selector = AluOutSelector.REG_AC
 
         self._instruction_operand = 0
 
     def _port_read(self) -> int:
-        return self._input_buffer.pop()
+        return self._input_buffer.pop(0)
 
     def _port_write(self, word: int):
         assert is_valid_byte(word), "Out of byte bounds"
@@ -132,8 +132,10 @@ class DataPath:
         self._alu_out_selector = 0
         self._instruction_operand = 0
 
-    def _alu_operand(self) -> int:
-        match self._alu_in_left_selector:
+    def _alu_operand(self, selector: AluInSelector) -> int:
+        match selector:
+            case AluInSelector.ZERO:
+                return 0
             case AluInSelector.REG_IP:
                 return self._instruction_pointer
             case AluInSelector.REG_AC:
@@ -148,6 +150,8 @@ class DataPath:
                 return self._frame_pointer
             case AluInSelector.REG_SP:
                 return self._stack_pointer
+            case AluInSelector.INS_OP:
+                return self._instruction_operand
             case _:
                 assert False, "Unknown alu operand"
 
@@ -209,7 +213,7 @@ class DataPath:
         self._alu_out_selector = selector
 
     def set_instruction_operand(self, operand: int):
-        assert is_valid_operand(operand), "Operand value out of bounds"
+        # assert is_valid_operand(operand), "Operand value out of bounds"
         self._instruction_operand = operand
 
     def alu_signals(
@@ -219,10 +223,10 @@ class DataPath:
         right_invert: bool = False,
         increment: bool = False,
     ):
-        left_operand = self._alu_operand()
+        left_operand = self._alu_operand(self._alu_in_left_selector)
         if left_invert:
             left_operand = ~left_operand
-        right_operand = self._alu_operand()
+        right_operand = self._alu_operand(self._alu_in_right_selector)
         if right_invert:
             right_operand = ~right_operand
         match operation:
@@ -246,7 +250,7 @@ class DataPath:
         self._clear_alu()
 
     def __repr__(self):
-        return "REGISTERS: [AC: {} FP: {} BR: {} SP: {} IP: {} DR: {} AR: {}]".format(
+        return "REGISTERS: [AC:{} FP:{} BR:{} SP:{} IP:{} DR:{} AR:{}]".format(
             self._accumulator,
             self._frame_pointer,
             self._buffer_register,
@@ -327,12 +331,10 @@ class ControlUnit:
             case Addressing.ABSOLUTE:
                 match tick:
                     case 0:
-                        self._data_path.set_left_alu_in_selector(AluInSelector.INS_OP)
-                        self._data_path.set_right_alu_in_selector(AluInSelector.ZERO)
-                        self._data_path.set_alu_out_selector(AluOutSelector.REG_AR)
-                        self._data_path.alu_signals(AluOperationSignal.ADD)
+                        self._move(AluInSelector.INS_OP, AluOutSelector.REG_AR)
                         return tick + 1
                     case 1:
+                        self._data_path.set_data_select(DataSelector.DATA_MEMORY)
                         self._data_path.read_signal()
                         return -1
                     case _:
@@ -341,10 +343,7 @@ class ControlUnit:
             case Addressing.CONTROL_FLOW:
                 match tick:
                     case 0:
-                        self._data_path.set_left_alu_in_selector(AluInSelector.INS_OP)
-                        self._data_path.set_right_alu_in_selector(AluInSelector.ZERO)
-                        self._data_path.set_alu_out_selector(AluOutSelector.REG_DR)
-                        self._data_path.alu_signals(AluOperationSignal.ADD)
+                        self._move(AluInSelector.INS_OP, AluOutSelector.REG_DR)
                         return -1
                     case _:
                         assert False, "Unexpected tick {}".format(tick)
@@ -360,13 +359,8 @@ class ControlUnit:
                         self._data_path.alu_signals(AluOperationSignal.ADD)
                         return tick + 1
                     case 1:
+                        self._data_path.set_data_select(DataSelector.DATA_MEMORY)
                         self._data_path.read_signal()
-                        return tick + 1
-                    case 2:
-                        self._data_path.set_left_alu_in_selector(AluInSelector.REG_DR)
-                        self._data_path.set_right_alu_in_selector(AluInSelector.ZERO)
-                        self._data_path.set_alu_out_selector(AluOutSelector.REG_AR)
-                        self._data_path.alu_signals(AluOperationSignal.ADD)
                         return -1
                     case _:
                         assert False, "Unexpected tick {}".format(tick)
@@ -382,15 +376,14 @@ class ControlUnit:
                         self._data_path.alu_signals(AluOperationSignal.ADD)
                         return tick + 1
                     case 1:
+                        self._data_path.set_data_select(DataSelector.DATA_MEMORY)
                         self._data_path.read_signal()
                         return tick + 1
                     case 2:
-                        self._data_path.set_left_alu_in_selector(AluInSelector.REG_DR)
-                        self._data_path.set_right_alu_in_selector(AluInSelector.ZERO)
-                        self._data_path.set_alu_out_selector(AluOutSelector.REG_AR)
-                        self._data_path.alu_signals(AluOperationSignal.ADD)
+                        self._move(AluInSelector.REG_DR, AluOutSelector.REG_AR)
                         return tick + 1
                     case 3:
+                        self._data_path.set_data_select(DataSelector.DATA_MEMORY)
                         self._data_path.read_signal()
                         return -1
                     case _:
@@ -401,33 +394,261 @@ class ControlUnit:
 
     def _execute(self, tick: int) -> int:
         opcode = self._current_instruction()["opcode"]
-        if opcode in {Opcode.ADD, Opcode.SUB, Opcode.AND, Opcode.OR, Opcode.NOT}:
-            match tick:
-                case 0:
-                    # TODO: Implement
-                    return -1
-                case _:
-                    assert False, "Unexpected tick {}".format(tick)
-        # TODO: Implement
-        # Opcode.LD
-        # Opcode.ST
-        # Opcode.PUT
-        # Opcode.GET
-        # Opcode.PUSH
-        # Opcode.POP
-        # Opcode.JMP
-        # Opcode.JZ
-        # Opcode.CALL
-        # Opcode.RET
-        # Opcode.ISPOS
-        # Opcode.ISNEG
-        # Opcode.ISZERO
-        elif opcode == Opcode.NOP:
-            pass
-        elif opcode == Opcode.HALT:
-            raise StopIteration()
-        else:
-            assert False, "Unknown opcode {}".format(opcode)
+        match opcode:
+            case Opcode.ADD:
+                match tick:
+                    case 0:
+                        self._data_path.set_left_alu_in_selector(AluInSelector.REG_AC)
+                        self._data_path.set_right_alu_in_selector(AluInSelector.REG_DR)
+                        self._data_path.set_alu_out_selector(AluOutSelector.REG_AC)
+                        self._data_path.alu_signals(AluOperationSignal.ADD)
+                        return -1
+                    case _:
+                        assert False, "Unexpected tick {}".format(tick)
+            case Opcode.SUB:
+                match tick:
+                    case 0:
+                        self._data_path.set_left_alu_in_selector(AluInSelector.REG_AC)
+                        self._data_path.set_right_alu_in_selector(AluInSelector.REG_DR)
+                        self._data_path.set_alu_out_selector(AluOutSelector.REG_AC)
+                        self._data_path.alu_signals(AluOperationSignal.ADD, increment=True, right_invert=True)
+                        return -1
+                    case _:
+                        assert False, "Unexpected tick {}".format(tick)
+            case Opcode.AND:
+                match tick:
+                    case 0:
+                        self._data_path.set_left_alu_in_selector(AluInSelector.REG_AC)
+                        self._data_path.set_right_alu_in_selector(AluInSelector.REG_DR)
+                        self._data_path.set_alu_out_selector(AluOutSelector.REG_AC)
+                        self._data_path.alu_signals(AluOperationSignal.AND)
+                        return -1
+                    case _:
+                        assert False, "Unexpected tick {}".format(tick)
+            case Opcode.OR:
+                match tick:
+                    case 0:
+                        self._data_path.set_left_alu_in_selector(AluInSelector.REG_AC)
+                        self._data_path.set_right_alu_in_selector(AluInSelector.REG_DR)
+                        self._data_path.set_alu_out_selector(AluOutSelector.REG_AC)
+                        self._data_path.alu_signals(AluOperationSignal.OR)
+                        return -1
+                    case _:
+                        assert False, "Unexpected tick {}".format(tick)
+            case Opcode.NOT:
+                match tick:
+                    case 0:
+                        self._data_path.set_left_alu_in_selector(AluInSelector.REG_AC)
+                        self._data_path.set_right_alu_in_selector(AluInSelector.ZERO)
+                        self._data_path.set_alu_out_selector(AluOutSelector.REG_AC)
+                        self._data_path.alu_signals(AluOperationSignal.ADD, left_invert=True)
+                        return -1
+                    case _:
+                        assert False, "Unexpected tick {}".format(tick)
+            case Opcode.JMP:
+                match tick:
+                    case 0:
+                        self._move(AluInSelector.REG_DR, AluOutSelector.REG_IP)
+                        return -1
+                    case _:
+                        assert False, "Unexpected tick {}".format(tick)
+            case Opcode.JZ:
+                match tick:
+                    case 0:
+                        if self._accumulator_zero():
+                            self._move(AluInSelector.REG_DR, AluOutSelector.REG_IP)
+                        return -1
+                    case _:
+                        assert False, "Unexpected tick {}".format(tick)
+            case Opcode.PUSH:
+                match tick:
+                    case 0:
+                        self._data_path.set_left_alu_in_selector(AluInSelector.REG_SP)
+                        self._data_path.set_right_alu_in_selector(AluInSelector.ZERO)
+                        self._data_path.set_alu_out_selector(AluOutSelector.REG_SP)
+                        self._data_path.alu_signals(AluOperationSignal.ADD, right_invert=True)
+                        return -1
+                    case _:
+                        assert False, "Unexpected tick {}".format(tick)
+            case Opcode.POP:
+                match tick:
+                    case 0:
+                        self._data_path.set_left_alu_in_selector(AluInSelector.REG_SP)
+                        self._data_path.set_right_alu_in_selector(AluInSelector.ZERO)
+                        self._data_path.set_alu_out_selector(AluOutSelector.REG_SP)
+                        self._data_path.alu_signals(AluOperationSignal.ADD, increment=True)
+                        return -1
+                    case _:
+                        assert False, "Unexpected tick {}".format(tick)
+            case Opcode.IS_POS:
+                match tick:
+                    case 0:
+                        self._data_path.set_left_alu_in_selector(AluInSelector.REG_AC)
+                        self._data_path.set_right_alu_in_selector(AluInSelector.ZERO)
+                        self._data_path.set_alu_out_selector(AluOutSelector.REG_AC)
+                        self._data_path.alu_signals(AluOperationSignal.IS_POS)
+                        return -1
+                    case _:
+                        assert False, "Unexpected tick {}".format(tick)
+            case Opcode.IS_NEG:
+                match tick:
+                    case 0:
+                        self._data_path.set_left_alu_in_selector(AluInSelector.REG_AC)
+                        self._data_path.set_right_alu_in_selector(AluInSelector.ZERO)
+                        self._data_path.set_alu_out_selector(AluOutSelector.REG_AC)
+                        self._data_path.alu_signals(AluOperationSignal.IS_NEG)
+                        return -1
+                    case _:
+                        assert False, "Unexpected tick {}".format(tick)
+            case Opcode.IS_ZERO:
+                match tick:
+                    case 0:
+                        self._data_path.set_left_alu_in_selector(AluInSelector.REG_AC)
+                        self._data_path.set_right_alu_in_selector(AluInSelector.ZERO)
+                        self._data_path.set_alu_out_selector(AluOutSelector.REG_AC)
+                        self._data_path.alu_signals(AluOperationSignal.IS_ZERO)
+                        return -1
+                    case _:
+                        assert False, "Unexpected tick {}".format(tick)
+            case Opcode.PUT:
+                match tick:
+                    case 0:
+                        self._move(AluInSelector.REG_AC, AluOutSelector.REG_DR)
+                        return tick + 1
+                    case 1:
+                        self._data_path.set_data_select(DataSelector.IO_PORT)
+                        self._data_path.write_signal()
+                        return -1
+                    case _:
+                        assert False, "Unexpected tick {}".format(tick)
+            case Opcode.GET:
+                match tick:
+                    case 0:
+                        self._data_path.set_data_select(DataSelector.IO_PORT)
+                        self._data_path.read_signal()
+                        return tick + 1
+                    case 1:
+                        self._move(AluInSelector.REG_DR, AluOutSelector.REG_AC)
+                        return -1
+                    case _:
+                        assert False, "Unexpected tick {}".format(tick)
+            case Opcode.ST:
+                match tick:
+                    case 0:
+                        self._move(AluInSelector.REG_AC, AluOutSelector.REG_DR)
+                        return tick + 1
+                    case 1:
+                        self._data_path.set_data_select(DataSelector.DATA_MEMORY)
+                        self._data_path.write_signal()
+                        return -1
+                    case _:
+                        assert False, "Unexpected tick {}".format(tick)
+            case Opcode.LD:
+                match tick:
+                    case 0:
+                        self._move(AluInSelector.REG_DR, AluOutSelector.REG_AC)
+                        return -1
+                    case _:
+                        assert False, "Unexpected tick {}".format(tick)
+            case Opcode.CALL:
+                return self._execute_call(tick)
+            case Opcode.RET:
+                return self._execute_ret(tick)
+            case Opcode.NOP:
+                return -1
+            case Opcode.HALT:
+                raise StopIteration()
+            case _:
+                assert False, "Unknown opcode {}".format(opcode)
+
+    def _execute_call(self, tick: int) -> int:
+        match tick:
+            case 0:
+                self._move(AluInSelector.REG_DR, AluOutSelector.REG_BR)
+                return tick + 1
+            case 1:
+                self._move(AluInSelector.REG_IP, AluOutSelector.REG_DR)
+                return tick + 1
+            case 2:
+                self._move(AluInSelector.REG_SP, AluOutSelector.REG_AR)
+                return tick + 1
+            case 3:
+                self._data_path.set_data_select(DataSelector.DATA_MEMORY)
+                self._data_path.write_signal()
+                return tick + 1
+            case 4:
+                self._data_path.set_left_alu_in_selector(AluInSelector.REG_SP)
+                self._data_path.set_right_alu_in_selector(AluInSelector.ZERO)
+                self._data_path.set_alu_out_selector(AluOutSelector.REG_SP)
+                self._data_path.alu_signals(AluOperationSignal.ADD, right_invert=True)
+                return tick + 1
+            case 5:
+                self._move(AluInSelector.REG_FP, AluOutSelector.REG_DR)
+                return tick + 1
+            case 6:
+                self._move(AluInSelector.REG_SP, AluOutSelector.REG_AR)
+                return tick + 1
+            case 7:
+                self._data_path.set_data_select(DataSelector.DATA_MEMORY)
+                self._data_path.write_signal()
+                return tick + 1
+            case 8:
+                self._data_path.set_left_alu_in_selector(AluInSelector.REG_SP)
+                self._data_path.set_right_alu_in_selector(AluInSelector.ZERO)
+                self._data_path.set_alu_out_selector(AluOutSelector.REG_SP)
+                self._data_path.alu_signals(AluOperationSignal.ADD, right_invert=True)
+                return tick + 1
+            case 9:
+                self._move(AluInSelector.REG_SP, AluOutSelector.REG_FP)
+                return tick + 1
+            case 10:
+                self._move(AluInSelector.REG_BR, AluOutSelector.REG_IP)
+                return -1
+            case _:
+                assert False, "Unexpected tick {}".format(tick)
+
+    def _execute_ret(self, tick: int) -> int:
+        match tick:
+            case 0:
+                self._data_path.set_left_alu_in_selector(AluInSelector.REG_SP)
+                self._data_path.set_right_alu_in_selector(AluInSelector.ZERO)
+                self._data_path.set_alu_out_selector(AluOutSelector.REG_SP)
+                self._data_path.alu_signals(AluOperationSignal.ADD, increment=True)
+                return tick + 1
+            case 1:
+                self._move(AluInSelector.REG_SP, AluOutSelector.REG_AR)
+                return tick + 1
+            case 2:
+                self._data_path.set_data_select(DataSelector.DATA_MEMORY)
+                self._data_path.read_signal()
+                return tick + 1
+            case 3:
+                self._move(AluInSelector.REG_DR, AluOutSelector.REG_FP)
+                return tick + 1
+            case 4:
+                self._data_path.set_left_alu_in_selector(AluInSelector.REG_SP)
+                self._data_path.set_right_alu_in_selector(AluInSelector.ZERO)
+                self._data_path.set_alu_out_selector(AluOutSelector.REG_SP)
+                self._data_path.alu_signals(AluOperationSignal.ADD, increment=True)
+                return tick + 1
+            case 5:
+                self._move(AluInSelector.REG_SP, AluOutSelector.REG_AR)
+                return tick + 1
+            case 6:
+                self._data_path.set_data_select(DataSelector.DATA_MEMORY)
+                self._data_path.read_signal()
+                return tick + 1
+            case 7:
+                self._move(AluInSelector.REG_DR, AluOutSelector.REG_IP)
+                return -1
+            case _:
+                assert False, "Unexpected tick {}".format(tick)
+
+    def _move(self, src: AluInSelector, dst: AluOutSelector):
+        self._data_path.set_left_alu_in_selector(src)
+        self._data_path.set_right_alu_in_selector(AluInSelector.ZERO)
+        self._data_path.set_alu_out_selector(dst)
+        self._data_path.alu_signals(AluOperationSignal.ADD)
 
     def __repr__(self):
         return "TICK: {:3} CR: {} DATA PATH: {}".format(self._tick, self._current_instruction(), self._data_path)
@@ -458,8 +679,8 @@ def simulation(
 
     if instr_counter >= limit:
         logging.warning("Limit exceeded!")
+    logging.info("output_buffer: %s", data_path.get_output_buffer())
     output = "".join([chr(byte) for byte in data_path.get_output_buffer()])
-    logging.info("output_buffer: %s", output)
     return output, instr_counter, control_unit.current_tick()
 
 
@@ -475,13 +696,13 @@ def main(code_file: str, input_file: str):
         data_segment,
         text_segment,
         data_memory_size=2048,
-        instruction_memory_size=1024,
+        instruction_memory_size=2048,
         input_tokens=input_tokens,
-        limit=1000,
+        limit=10000000,
     )
 
     print("".join(output))
-    print("instr_counter: ", instr_counter, "ticks:", ticks)
+    print("instr_counter: {}, ticks: {}".format(instr_counter, ticks))
 
 
 if __name__ == "__main__":

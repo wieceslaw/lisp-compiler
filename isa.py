@@ -17,9 +17,9 @@ class Opcode(str, Enum):
     JZ = "jz"
     CALL = "call"
     RET = "ret"
-    ISPOS = "ispos"
-    ISNEG = "isneg"
-    ISZERO = "iszero"
+    IS_POS = "ispos"
+    IS_NEG = "isneg"
+    IS_ZERO = "iszero"
     NOP = "nop"
     HALT = "halt"
 
