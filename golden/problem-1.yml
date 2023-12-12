@@ -33,13 +33,13 @@ out_log: |
   DEBUG   machine:simulation    TICK:  48 CR: {'opcode': LD, 'address': {'type': 'absolute', 'value': 1}, 'debug': 'variable value [i]', 'index': 14} DATA PATH: REGISTERS: [AC:1 FP:0 BR:0 SP:2047 IP:15 DR:1 AR:1]
   DEBUG   machine:simulation    TICK:  50 CR: {'opcode': PUSH, 'index': 15} DATA PATH: REGISTERS: [AC:1 FP:0 BR:0 SP:2046 IP:16 DR:1 AR:1]
   DEBUG   machine:simulation    TICK:  54 CR: {'opcode': ST, 'address': {'type': 'relative', 'register': 'sp', 'offset': 1}, 'index': 16} DATA PATH: REGISTERS: [AC:1 FP:0 BR:0 SP:2046 IP:17 DR:1 AR:2047]
-  DEBUG   machine:simulation    TICK:  58 CR: {'opcode': LD, 'address': {'type': 'absolute', 'value': 4}, 'debug': 'number literal [10]', 'index': 17} DATA PATH: REGISTERS: [AC:10 FP:0 BR:0 SP:2046 IP:18 DR:10 AR:4]
-  DEBUG   machine:simulation    TICK:  60 CR: {'opcode': PUSH, 'index': 18} DATA PATH: REGISTERS: [AC:10 FP:0 BR:0 SP:2045 IP:19 DR:10 AR:4]
-  DEBUG   machine:simulation    TICK:  64 CR: {'opcode': ST, 'address': {'type': 'relative', 'register': 'sp', 'offset': 1}, 'index': 19} DATA PATH: REGISTERS: [AC:10 FP:0 BR:0 SP:2045 IP:20 DR:10 AR:2046]
+  DEBUG   machine:simulation    TICK:  58 CR: {'opcode': LD, 'address': {'type': 'absolute', 'value': 4}, 'debug': 'number literal [1000]', 'index': 17} DATA PATH: REGISTERS: [AC:1000 FP:0 BR:0 SP:2046 IP:18 DR:1000 AR:4]
+  DEBUG   machine:simulation    TICK:  60 CR: {'opcode': PUSH, 'index': 18} DATA PATH: REGISTERS: [AC:1000 FP:0 BR:0 SP:2045 IP:19 DR:1000 AR:4]
+  DEBUG   machine:simulation    TICK:  64 CR: {'opcode': ST, 'address': {'type': 'relative', 'register': 'sp', 'offset': 1}, 'index': 19} DATA PATH: REGISTERS: [AC:1000 FP:0 BR:0 SP:2045 IP:20 DR:1000 AR:2046]
   DEBUG   machine:simulation    TICK:  68 CR: {'opcode': LD, 'address': {'type': 'relative', 'register': 'sp', 'offset': 2}, 'debug': 'binary operation [T_LESS]', 'index': 20} DATA PATH: REGISTERS: [AC:1 FP:0 BR:0 SP:2045 IP:21 DR:1 AR:2047]
-  DEBUG   machine:simulation    TICK:  72 CR: {'opcode': SUB, 'address': {'type': 'relative', 'register': 'sp', 'offset': 1}, 'index': 21} DATA PATH: REGISTERS: [AC:-9 FP:0 BR:0 SP:2045 IP:22 DR:10 AR:2046]
-  DEBUG   machine:simulation    TICK:  74 CR: {'opcode': IS_NEG, 'index': 22} DATA PATH: REGISTERS: [AC:1 FP:0 BR:0 SP:2045 IP:23 DR:10 AR:2046]
-  DEBUG   machine:simulation    TICK:  76 CR: {'opcode': POP, 'index': 23} DATA PATH: REGISTERS: [AC:1 FP:0 BR:0 SP:2046 IP:24 DR:10 AR:2046]
+  DEBUG   machine:simulation    TICK:  72 CR: {'opcode': SUB, 'address': {'type': 'relative', 'register': 'sp', 'offset': 1}, 'index': 21} DATA PATH: REGISTERS: [AC:-999 FP:0 BR:0 SP:2045 IP:22 DR:1000 AR:2046]
+  DEBUG   machine:simulation    TICK:  74 CR: {'opcode': IS_NEG, 'index': 22} DATA PATH: REGISTERS: [AC:1 FP:0 BR:0 SP:2045 IP:23 DR:1000 AR:2046]
+  DEBUG   machine:simulation    TICK:  76 CR: {'opcode': POP, 'index': 23} DATA PATH: REGISTERS: [AC:1 FP:0 BR:0 SP:2046 IP:24 DR:1000 AR:2046]
   DEBUG   machine:simulation    TICK:  80 CR: {'opcode': ST, 'address': {'type': 'relative', 'register': 'sp', 'offset': 1}, 'index': 24} DATA PATH: REGISTERS: [AC:1 FP:0 BR:0 SP:2046 IP:25 DR:1 AR:2047]
   DEBUG   machine:simulation    TICK:  84 CR: {'opcode': LD, 'address': {'type': 'relative', 'register': 'sp', 'offset': 1}, 'index': 25} DATA PATH: REGISTERS: [AC:1 FP:0 BR:0 SP:2046 IP:26 DR:1 AR:2047]
   DEBUG   machine:simulation    TICK:  87 CR: {'opcode': JZ, 'address': {'type': 'control-flow', 'value': 106}, 'debug': 'jump out of loop', 'index': 26} DATA PATH: REGISTERS: [AC:1 FP:0 BR:0 SP:2046 IP:27 DR:106 AR:2047]
@@ -525,13 +525,13 @@ out_log: |
   DEBUG   machine:simulation    TICK: 1651 CR: {'opcode': LD, 'address': {'type': 'absolute', 'value': 1}, 'debug': 'variable value [i]', 'index': 14} DATA PATH: REGISTERS: [AC:2 FP:0 BR:152 SP:2047 IP:15 DR:2 AR:1]
   DEBUG   machine:simulation    TICK: 1653 CR: {'opcode': PUSH, 'index': 15} DATA PATH: REGISTERS: [AC:2 FP:0 BR:152 SP:2046 IP:16 DR:2 AR:1]
   DEBUG   machine:simulation    TICK: 1657 CR: {'opcode': ST, 'address': {'type': 'relative', 'register': 'sp', 'offset': 1}, 'index': 16} DATA PATH: REGISTERS: [AC:2 FP:0 BR:152 SP:2046 IP:17 DR:2 AR:2047]
-  DEBUG   machine:simulation    TICK: 1661 CR: {'opcode': LD, 'address': {'type': 'absolute', 'value': 4}, 'debug': 'number literal [10]', 'index': 17} DATA PATH: REGISTERS: [AC:10 FP:0 BR:152 SP:2046 IP:18 DR:10 AR:4]
-  DEBUG   machine:simulation    TICK: 1663 CR: {'opcode': PUSH, 'index': 18} DATA PATH: REGISTERS: [AC:10 FP:0 BR:152 SP:2045 IP:19 DR:10 AR:4]
-  DEBUG   machine:simulation    TICK: 1667 CR: {'opcode': ST, 'address': {'type': 'relative', 'register': 'sp', 'offset': 1}, 'index': 19} DATA PATH: REGISTERS: [AC:10 FP:0 BR:152 SP:2045 IP:20 DR:10 AR:2046]
+  DEBUG   machine:simulation    TICK: 1661 CR: {'opcode': LD, 'address': {'type': 'absolute', 'value': 4}, 'debug': 'number literal [1000]', 'index': 17} DATA PATH: REGISTERS: [AC:1000 FP:0 BR:152 SP:2046 IP:18 DR:1000 AR:4]
+  DEBUG   machine:simulation    TICK: 1663 CR: {'opcode': PUSH, 'index': 18} DATA PATH: REGISTERS: [AC:1000 FP:0 BR:152 SP:2045 IP:19 DR:1000 AR:4]
+  DEBUG   machine:simulation    TICK: 1667 CR: {'opcode': ST, 'address': {'type': 'relative', 'register': 'sp', 'offset': 1}, 'index': 19} DATA PATH: REGISTERS: [AC:1000 FP:0 BR:152 SP:2045 IP:20 DR:1000 AR:2046]
   DEBUG   machine:simulation    TICK: 1671 CR: {'opcode': LD, 'address': {'type': 'relative', 'register': 'sp', 'offset': 2}, 'debug': 'binary operation [T_LESS]', 'index': 20} DATA PATH: REGISTERS: [AC:2 FP:0 BR:152 SP:2045 IP:21 DR:2 AR:2047]
-  DEBUG   machine:simulation    TICK: 1675 CR: {'opcode': SUB, 'address': {'type': 'relative', 'register': 'sp', 'offset': 1}, 'index': 21} DATA PATH: REGISTERS: [AC:-8 FP:0 BR:152 SP:2045 IP:22 DR:10 AR:2046]
-  DEBUG   machine:simulation    TICK: 1677 CR: {'opcode': IS_NEG, 'index': 22} DATA PATH: REGISTERS: [AC:1 FP:0 BR:152 SP:2045 IP:23 DR:10 AR:2046]
-  DEBUG   machine:simulation    TICK: 1679 CR: {'opcode': POP, 'index': 23} DATA PATH: REGISTERS: [AC:1 FP:0 BR:152 SP:2046 IP:24 DR:10 AR:2046]
+  DEBUG   machine:simulation    TICK: 1675 CR: {'opcode': SUB, 'address': {'type': 'relative', 'register': 'sp', 'offset': 1}, 'index': 21} DATA PATH: REGISTERS: [AC:-998 FP:0 BR:152 SP:2045 IP:22 DR:1000 AR:2046]
+  DEBUG   machine:simulation    TICK: 1677 CR: {'opcode': IS_NEG, 'index': 22} DATA PATH: REGISTERS: [AC:1 FP:0 BR:152 SP:2045 IP:23 DR:1000 AR:2046]
+  DEBUG   machine:simulation    TICK: 1679 CR: {'opcode': POP, 'index': 23} DATA PATH: REGISTERS: [AC:1 FP:0 BR:152 SP:2046 IP:24 DR:1000 AR:2046]
   DEBUG   machine:simulation    TICK: 1683 CR: {'opcode': ST, 'address': {'type': 'relative', 'register': 'sp', 'offset': 1}, 'index': 24} DATA PATH: REGISTERS: [AC:1 FP:0 BR:152 SP:2046 IP:25 DR:1 AR:2047]
   DEBUG   machine:simulation    TICK: 1687 CR: {'opcode': LD, 'address': {'type': 'relative', 'register': 'sp', 'offset': 1}, 'index': 25} DATA PATH: REGISTERS: [AC:1 FP:0 BR:152 SP:2046 IP:26 DR:1 AR:2047]
   DEBUG   machine:simulation    TICK: 1690 CR: {'opcode': JZ, 'address': {'type': 'control-flow', 'value': 106}, 'debug': 'jump out of loop', 'index': 26} DATA PATH: REGISTERS: [AC:1 FP:0 BR:152 SP:2046 IP:27 DR:106 AR:2047]
@@ -1016,12 +1016,12 @@ out_log: |
   DEBUG   machine:simulation    TICK: 3261 CR: {'opcode': ST, 'address': {'type': 'relative', 'register': 'sp', 'offset': 1}, 'index': 403} DATA PATH: REGISTERS: [AC:3 FP:2041 BR:152 SP:2034 IP:404 DR:3 AR:2035]
   DEBUG   machine:simulation    TICK: 3265 CR: {'opcode': LD, 'address': {'type': 'relative', 'register': 'sp', 'offset': 2}, 'debug': 'binary operation [T_PLUS]', 'index': 404} DATA PATH: REGISTERS: [AC:0 FP:2041 BR:152 SP:2034 IP:405 DR:0 AR:2036]
   DEBUG   machine:simulation    TICK: 3269 CR: {'opcode': ADD, 'address': {'type': 'relative', 'register': 'sp', 'offset': 1}, 'index': 405} DATA PATH: REGISTERS: [AC:3 FP:2041 BR:152 SP:2034 IP:406 DR:3 AR:2035]
-  INFO    machine:simulation    output_buffer: [51, 51]
+  INFO    machine:simulation    output_buffer: [50, 51, 52, 49, 54, 56]
 out_stdout: |
   source LoC: 100 code instr: 911 static memory: 52
   ============================================================
-  33
-  instruction count: 8635 ticks: 28266
+  234168
+  instruction count: 3040504 ticks: 10001672
 out_code: |-
   {"code": [{"opcode": "nop", "debug": "program start", "index": 0},
    {"opcode": "ld", "address": {"type": "absolute", "value": 2}, "debug": "number literal [0]", "index": 1},
@@ -1040,7 +1040,7 @@ out_code: |-
    {"opcode": "ld", "address": {"type": "absolute", "value": 1}, "debug": "variable value [i]", "index": 14},
    {"opcode": "push", "index": 15},
    {"opcode": "st", "address": {"type": "relative", "register": "sp", "offset": 1}, "index": 16},
-   {"opcode": "ld", "address": {"type": "absolute", "value": 4}, "debug": "number literal [10]", "index": 17},
+   {"opcode": "ld", "address": {"type": "absolute", "value": 4}, "debug": "number literal [1000]", "index": 17},
    {"opcode": "push", "index": 18},
    {"opcode": "st", "address": {"type": "relative", "register": "sp", "offset": 1}, "index": 19},
    {"opcode": "ld", "address": {"type": "relative", "register": "sp", "offset": 2}, "debug": "binary operation [T_LESS]", "index": 20},
@@ -1934,4 +1934,4 @@ out_code: |-
    {"opcode": "ld", "address": {"type": "relative", "register": "sp", "offset": 1}, "debug": "save result", "index": 908},
    {"opcode": "pop", "debug": "clear result", "index": 909},
    {"opcode": "ret", "index": 910}],
-   "data": [0, 0, 0, 1, 10, 1, 0, 5, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 45, 0, 10, 48, 10]}
+   "data": [0, 0, 0, 1, 1000, 1, 0, 5, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 45, 0, 10, 48, 10]}
