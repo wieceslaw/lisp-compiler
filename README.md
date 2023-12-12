@@ -827,4 +827,4 @@ $ poetry run ruff format .
 | Лебедев Вячеслав Владимирович | hello                      | 89    | -           | 105           | 646      | 2153    | lisp \| acc \| harv \| hw \| tick \| struct \| stream \| port \| pstr \| prob1 \| 8bit |
 | Лебедев Вячеслав Владимирович | cat                        | 93    | -           | 97            | 243      | 818     | lisp \| acc \| harv \| hw \| tick \| struct \| stream \| port \| pstr \| prob1 \| 8bit |
 | Лебедев Вячеслав Владимирович | hello_user_name            | 97    | -           | 315           | 2114     | 7103    | lisp \| acc \| harv \| hw \| tick \| struct \| stream \| port \| pstr \| prob1 \| 8bit |
-| Лебедев Вячеслав Владимирович | prob1. Multiples of 3 or 5 | 100   | -           | 911           | 8635     | 28266   | lisp \| acc \| harv \| hw \| tick \| struct \| stream \| port \| pstr \| prob1 \| 8bit |
+| Лебедев Вячеслав Владимирович | prob1. Multiples of 3 or 5 | 100   | -           | 911           | 2577133  | 8475909 | lisp \| acc \| harv \| hw \| tick \| struct \| stream \| port \| pstr \| prob1 \| 8bit |

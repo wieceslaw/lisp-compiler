@@ -720,7 +720,7 @@ def main(code_file: str, input_file: str):
         data_memory_size=2048,
         instruction_memory_size=2048,
         input_tokens=input_tokens,
-        limit=100000,
+        limit=100000000,
     )
 
     print("".join(output))
