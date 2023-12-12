@@ -3,10 +3,13 @@ import io
 import logging
 import os
 import tempfile
+import unittest
 
 import machine
 import pytest
 import translator
+from lexer import Lexer
+from parsing import Parser
 
 
 @pytest.mark.golden_test("golden/*.yml")
@@ -55,3 +58,78 @@ def test_translator_and_machine(golden, caplog):
         assert code == golden.out["out_code"]
         assert stdout.getvalue() == golden.out["out_stdout"]
         assert caplog.text == golden.out["out_log"]
+
+
+class TestLexer(unittest.TestCase):
+    def _assert_wrong(self, source: str):
+        with pytest.raises(AssertionError):
+            Lexer(source).tokenize()
+
+    def test_unknown_tokens(self):
+        unknown_symbols = "%$#@&№:"
+        for symbol in unknown_symbols:
+            self._assert_wrong(symbol)
+
+    def test_wrong_char_literal(self):
+        source = """
+        'a"
+        """
+        self._assert_wrong(source)
+
+    def test_wrong_string_literal(self):
+        source = '"hello'
+        self._assert_wrong(source)
+
+
+class TestParser(unittest.TestCase):
+    def _assert_wrong(self, source: str):
+        with pytest.raises(AssertionError):
+            Parser(Lexer(source).tokenize()).parse()
+
+    def test_function_definition(self):
+        self._assert_wrong("defun")
+        self._assert_wrong("(defun")
+        self._assert_wrong("defun)")
+        self._assert_wrong("(defun)")
+        self._assert_wrong("(defun()")
+        self._assert_wrong("(defun))")
+
+    def test_function_call(self):
+        self._assert_wrong("(foo 1 2")
+        self._assert_wrong("(2)")
+
+    def test_allocation(self):
+        self._assert_wrong("(alloc")
+        self._assert_wrong("(alloc)")
+        self._assert_wrong("(alloc str)")
+        self._assert_wrong("(alloc (foo))")
+
+    def test_binary(self):
+        self._assert_wrong("(1 2")
+        self._assert_wrong("(1 2)")
+        self._assert_wrong("(+ 1 2")
+        self._assert_wrong("(+ 1)")
+        self._assert_wrong("(+)")
+        self._assert_wrong("(+ 1 2 3)")
+
+    def test_unary(self):
+        self._assert_wrong("(not")
+        self._assert_wrong("(not)")
+        self._assert_wrong("(not 1 2)")
+
+    def test_nullary(self):
+        self._assert_wrong("(get")
+        self._assert_wrong("(get 1)")
+        self._assert_wrong("(get 1 2)")
+
+    def test_loop(self):
+        self._assert_wrong("(loop")
+        self._assert_wrong("(loop)")
+
+    def test_if_condition(self):
+        self._assert_wrong("(if)")
+        self._assert_wrong("if")
+        self._assert_wrong("(if")
+        self._assert_wrong("if)")
+        self._assert_wrong("(if 1)")
+        self._assert_wrong("(if 1 2)")

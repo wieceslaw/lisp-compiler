@@ -257,7 +257,7 @@ out_stdout: |
   source LoC: 93 code instr: 97 static memory: 12
   ============================================================
   foo
-  instr_counter: 243, ticks: 818
+  instruction count: 243 ticks: 818
 out_code: |-
   {"code": [{"opcode": "nop", "debug": "program start", "index": 0},
    {"opcode": "get", "debug": "nullary operator", "index": 1},

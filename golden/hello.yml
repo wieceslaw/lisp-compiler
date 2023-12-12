@@ -1,7 +1,6 @@
 in_source: |-
   ; напечатать hello world
   (print "Hello, world!")
-
 in_stdin: |-
   .
 out_log: |
@@ -657,7 +656,7 @@ out_stdout: |
   source LoC: 89 code instr: 105 static memory: 24
   ============================================================
   Hello, world!
-  instr_counter: 646, ticks: 2153
+  instruction count: 646 ticks: 2153
 out_code: |-
   {"code": [{"opcode": "nop", "debug": "program start", "index": 0},
    {"opcode": "ld", "address": {"type": "absolute", "value": 14}, "debug": "string literal [Hello, world!]", "index": 1},
