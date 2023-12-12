@@ -4,7 +4,7 @@ in_source: |-
   ; Find the sum of all the multiples of 3 or 5 below 1000.
   (setq sum 0)
   (setq i 1)
-  (loop (< i 10)
+  (loop (< i 1000)
       (setq i (+ 1 i))
       (if (or (= 0 (mod i 5)) (= 0 (mod i 3)))
           (setq sum (+ sum i))
