@@ -1,30 +1,46 @@
 ; вспомогательная функция для объединения выражений
-(defun .(x, y))
-
-; инвертировать число
-(defun neg(n)
-    (+ 1 (not n))
-)
+(defun .(x, y) y)
 
 ; логическое нет
 (defun is-not(b)
     (if (= b 0) 1 0)
 )
 
+; остаток от деления n на d
+(defun mod(n d)
+    (setq a (if (< n 0) (- 0 n) n))
+    (setq b (if (< d 0) (- 0 d) d))
+    (setq negative (or (and (< n 0) (or (> d 0) (= d 0))) (and (or (> n 0) (= n 0)) (< d 0))))
+    (setq output 0)
+    (loop (or (= a b) (> a b))
+        (setq decrement b)
+        (loop (or (> a decrement) (= a decrement))
+            (setq a (- a decrement))
+            (setq output (+ output decrement))
+            (setq decrement (+ decrement decrement))
+        )
+    )
+    (if negative (- 0 output) output)
+    (- n output)
+)
+
 ; целочисленное деление n на d
 (defun div(n d)
-    (setq negative (< n 0))
-    (if negative
-        (setq n (neg n))
-        0                       ; skip "else" branch
-    )                           ; temporary change sign
-    (setq r n)
-    (setq q 0)
-    (loop (or (> r d) (= r d))
-        (setq r (- r d))
-        (setq q (+ 1 q))
+    (setq a (if (< n 0) (- 0 n) n))
+    (setq b (if (< d 0) (- 0 d) d))
+    (setq negative (or (and (< n 0) (or (> d 0) (= d 0))) (and (or (> n 0) (= n 0)) (< d 0))))
+    (setq output 0)
+    (loop (or (= a b) (> a b))
+        (setq counter 1)
+        (setq decrement b)
+        (loop (or (> a decrement) (= a decrement))
+            (setq a (- a decrement))
+            (setq output (+ output counter))
+            (setq counter (+ counter counter))
+            (setq decrement (+ decrement decrement))
+        )
     )
-    (if negative (neg q) q)     ; return sign
+    (if negative (- 0 output) output)
 )
 
 ; вывести число n (используется рекурсия для вывода цифр в корректном порядке)
@@ -33,11 +49,11 @@
         0 ; return from recursion
         (. (.
             (if (< n 0)
-                (. (setq n (neg n)) (put '-'))
+                (. (setq n (- 0 n)) (put '-'))
                 0
             )
             (print-num (div n 10))) ; goto recursion
-            (put (mod n 10))
+            (put (+ '0' (mod n 10)))
         )
     )
 )
@@ -46,7 +62,7 @@
 (defun print(addr)
     (setq len (load addr))
     (setq i 0)
-    (loop (or (> len i) (= len i))
+    (loop (> len i)
         (setq i (+ i 1))
         (put (load (+ addr i)))
     )

@@ -1,19 +1,21 @@
+from __future__ import annotations
+
 from typing import Callable
 
-from lexer import TokenType, Token, binary_operators, unary_operators, nullary_operators
+from lexer import Token, TokenType, binary_operators, nullary_operators, unary_operators
 
 
 class Expression:
     def __init__(self, token: Token):
         self.token = token
 
-    def children(self) -> list['Expression']:
+    def children(self) -> list[Expression]:
         return []
 
-    def apply(self, f: Callable[['Expression'], 'Expression']) -> None:
+    def apply(self, f: Callable[[Expression], Expression]) -> None:
         return
 
-    def apply_traverse(self, f: Callable[['Expression'], 'Expression']):
+    def apply_traverse(self, f: Callable[[Expression], Expression]):
         self.apply(f)
         for node in self.children():
             node.apply_traverse(f)
@@ -27,10 +29,10 @@ class RootExpression(Expression):
     def __repr__(self) -> str:
         return f"ROOT [{self.expressions}]"
 
-    def children(self) -> list['Expression']:
+    def children(self) -> list[Expression]:
         return self.expressions
 
-    def apply(self, f: Callable[['Expression'], 'Expression']) -> None:
+    def apply(self, f: Callable[[Expression], Expression]) -> None:
         self.expressions = list(map(f, self.expressions))
 
 
@@ -87,19 +89,16 @@ class VariableValueExpression(Expression):
 
 
 class ConditionExpression(Expression):
-    def __init__(self,
-                 token: Token,
-                 condition: Expression,
-                 true_expression: Expression,
-                 false_expression: Expression) -> None:
+    def __init__(
+        self, token: Token, condition: Expression, true_expression: Expression, false_expression: Expression
+    ) -> None:
         super().__init__(token)
         self.condition = condition
         self.true_expression = true_expression
         self.false_expression = false_expression
 
     def __repr__(self) -> str:
-        return ("CONDITION [{}, TRUE: {}, FALSE: {}]"
-                .format(self.condition, self.true_expression, self.false_expression))
+        return "CONDITION [{}, TRUE: {}, FALSE: {}]".format(self.condition, self.true_expression, self.false_expression)
 
     def children(self) -> list[Expression]:
         return [self.condition, self.true_expression, self.false_expression]
@@ -120,7 +119,7 @@ class LoopExpression(Expression):
         return "LOOP [CONDITION: {}, BODY: {}]".format(self.condition, self.body)
 
     def children(self) -> list[Expression]:
-        return self.body + [self.condition]
+        return [self.condition, *self.body]
 
     def apply(self, f: Callable[[Expression], Expression]) -> None:
         self.body = list(map(f, self.body))
@@ -135,8 +134,7 @@ class FunctionDefinitionExpression(Expression):
         self.body = body
 
     def __repr__(self) -> str:
-        return ('FUNCTION DEF [NAME: "{}", PARAMETERS: {}, BODY: {}]'
-                .format(self.name, self.parameters, self.body))
+        return 'FUNCTION DEF [NAME: "{}", PARAMETERS: {}, BODY: {}]'.format(self.name, self.parameters, self.body)
 
     def children(self) -> list[Expression]:
         return self.body
@@ -210,7 +208,12 @@ class AllocationExpression(Expression):
         self.size = size
 
     def __repr__(self) -> str:
-        return 'MEMORY ALLOCATION [SIZE: {}]'.format(self.size)
+        return "MEMORY ALLOCATION [SIZE: {}]".format(self.size)
+
+
+class EmptyExpression(Expression):
+    def __init__(self, token: Token) -> None:
+        super().__init__(token)
 
 
 class Parser:
@@ -243,43 +246,43 @@ class Parser:
             assert token.type == TokenType.CLOSE_BRACKET
             self._next()
             return result
-        elif token.type == TokenType.VARNAME:
+        if token.type == TokenType.VARNAME:
             self._next()
             return VariableValueExpression(token, token.value)
-        elif token.type == TokenType.NUMBER_LITERAL:
+        if token.type == TokenType.NUMBER_LITERAL:
             self._next()
             return NumberLiteralExpression(token, token.value)
-        elif token.type == TokenType.STRING_LITERAL:
+        if token.type == TokenType.STRING_LITERAL:
             self._next()
             return StringLiteralExpression(token, token.value)
-        elif token.type == TokenType.CHARACTER_LITERAL:
+        if token.type == TokenType.CHARACTER_LITERAL:
             self._next()
             return CharacterLiteralExpression(token, token.value)
-        else:
-            assert False, "Unexpected token {}".format(token)
+        assert False, "Unexpected token {}".format(token)
 
     def _parse_bracketed_expression(self) -> Expression:
         token = self._cur_token()
-        if token.type == TokenType.VARNAME:
-            return self._parse_function_call()
-        elif token.type == TokenType.KEY_IF:
-            return self._parse_if_condition()
-        elif token.type == TokenType.KEY_DEFUN:
-            return self._parse_function_definition()
-        elif token.type == TokenType.KEY_SETQ:
-            return self._parse_assignment()
-        elif token.type in binary_operators():
-            return self._parse_binary_operator()
-        elif token.type == TokenType.KEY_LOOP:
-            return self._parse_loop_expression()
-        elif token.type in unary_operators():
-            return self._parse_unary_operator()
-        elif token.type == TokenType.KEY_ALLOC:
-            return self._parse_allocation()
-        elif token.type in nullary_operators():
-            return self._parse_nullary_operator()
-        else:
-            assert False, "Unexpected token"
+        match token.type:
+            case TokenType.VARNAME:
+                return self._parse_function_call()
+            case TokenType.KEY_IF:
+                return self._parse_if_condition()
+            case TokenType.KEY_DEFUN:
+                return self._parse_function_definition()
+            case TokenType.KEY_SETQ:
+                return self._parse_assignment()
+            case TokenType.KEY_LOOP:
+                return self._parse_loop_expression()
+            case TokenType.KEY_ALLOC:
+                return self._parse_allocation()
+            case _:
+                if token.type in binary_operators():
+                    return self._parse_binary_operator()
+                if token.type in unary_operators():
+                    return self._parse_unary_operator()
+                if token.type in nullary_operators():
+                    return self._parse_nullary_operator()
+        assert False, "Unexpected token"
 
     def _parse_function_call(self) -> Expression:
         token = self._cur_token()

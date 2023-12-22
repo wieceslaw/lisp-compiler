@@ -1,12 +1,11 @@
 ; запросить у пользователя его имя, считать его, вывести на экран приветствие
 ; (< -- ввод пользователя через файл ввода, > вывод симулятора):
 
-(setq buffer-size (512))
-(setq buffer (alloc buffer-size))
-
-(print "> What is your name?\n")
-(print "> ")
-(print (read(buffer buffer-size)))
+(setq buffer-size 512)
+(setq buffer (alloc 512))
+(print "> What is your name?")
+(put 10)
+(read buffer buffer-size)
 (print "> Hello, ")
 (print buffer)
 (print "!")

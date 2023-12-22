@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import re
 from enum import Enum
 
@@ -16,7 +18,6 @@ class TokenType(str, Enum):
     LESS = "T_LESS"  # <
     GREATER = "T_GREATER"  # >
 
-    MOD = "T_MOD"  # mod
     AND = "T_AND"  # and
     OR = "T_OR"  # or
     NOT = "T_NOT"  # not
@@ -44,7 +45,6 @@ tokens_patterns = [
     (r"=", TokenType.EQUALS),
     (r"<", TokenType.LESS),
     (r">", TokenType.GREATER),
-    (r"mod", TokenType.MOD),
     (r"and", TokenType.AND),
     (r"or", TokenType.OR),
     (r"not", TokenType.NOT),
@@ -59,7 +59,7 @@ tokens_patterns = [
     (r"if", TokenType.KEY_IF),
     (r"'.'", TokenType.CHARACTER_LITERAL),
     (r'"(.*)"', TokenType.STRING_LITERAL),
-    (r"[0-9]+", TokenType.NUMBER_LITERAL),
+    (r"[+-]?[0-9]+", TokenType.NUMBER_LITERAL),
     (r"[a-zA-Z\.]\w*", TokenType.VARNAME),
 ]
 assert len(tokens_patterns) == len([i for i in TokenType])  # assert that all cases are matched
@@ -68,7 +68,6 @@ tokens_patterns = [(re.compile(pattern), ttype) for pattern, ttype in tokens_pat
 
 def binary_operators():
     return {
-        TokenType.MOD,
         TokenType.AND,
         TokenType.OR,
         TokenType.PLUS,
@@ -76,22 +75,16 @@ def binary_operators():
         TokenType.EQUALS,
         TokenType.LESS,
         TokenType.GREATER,
-        TokenType.KEY_STORE
+        TokenType.KEY_STORE,
     }
 
 
 def unary_operators():
-    return {
-        TokenType.NOT,
-        TokenType.KEY_LOAD,
-        TokenType.KEY_PUT
-    }
+    return {TokenType.NOT, TokenType.KEY_LOAD, TokenType.KEY_PUT}
 
 
 def nullary_operators():
-    return {
-        TokenType.KEY_GET
-    }
+    return {TokenType.KEY_GET}
 
 
 class Token:
@@ -131,13 +124,13 @@ class Lexer:
     def tokenize(self) -> list[Token]:
         tokens = []
         while True:
-            token = self.next()
+            token = self._next()
             if token is None:
                 break
             tokens.append(token)
         return tokens
 
-    def next(self) -> Token:
+    def _next(self) -> Token | None:
         if self._skip_empty():
             return None
         char = self.text[self.ptr]
@@ -146,12 +139,11 @@ class Lexer:
             self.ptr += 1
             self.offset += 1
             return Token(char, self.line, current_offset)
-        elif char == '"':
+        if char == '"':
             return Token(self._read_string_literal(), self.line, current_offset)
-        elif char == "'":
+        if char == "'":
             return Token(self._read_character_literal(), self.line, current_offset)
-        else:
-            return Token(self._read_string(), self.line, current_offset)
+        return Token(self._read_string(), self.line, current_offset)
 
     def _read_string(self) -> str:
         result = ""
